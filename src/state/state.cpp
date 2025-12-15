@@ -39,7 +39,7 @@ std::string State::marshalJSON()
         entity[F("lightSwitchState")] = _lightSwitchState ? "ON" : "OFF";
         entity[F("lightBrightness")] = _lightBrightness;
         entity[F("lightColor")] = EDUtils::formatString("%d,%d,%d", _lightColor.r, _lightColor.g, _lightColor.b);
-        entity[F("lightTempColor")] = _lightTempColor;
+        entity[F("lightColorTemp")] = _lightTempColor;
     });
 
     return payload;

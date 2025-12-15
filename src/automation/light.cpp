@@ -41,7 +41,9 @@ void LightAutomation::init(EDHA::Device* device, std::string stateTopic, std::st
         ->setColorTempCommandTemplate("{\"lightColorTemp\": {{ value }} }")
         ->setColorTempCommandTopic(commandTopic)
         ->setColorTempStateTopic(stateTopic)
-        ->setColorTempValueTemplate("{{ value_json.lightColorTemp }}");
+        ->setColorTempValueTemplate("{{ value_json.lightColorTemp }}")
+        ->setMinKelvin(2700)
+        ->setMaxKelvin(6000);
 
     _state = _configMgr->getConfig().lightState;
     if (_state.enabled) {
@@ -128,6 +130,27 @@ void LightAutomation::loop()
         }
 
         _lastStateUpdateTime = millis();
+    }
+
+    if ((_lastManualStateUpdateTime + 500) < millis()) {
+        bool isEnabled = _main->isEnabled();
+        uint8_t brightness = _main->getBrightness();
+        uint32_t colorTemperature = _main->getColorTemperature();
+
+        if (_state.enabled != isEnabled) {
+            changeStateInternal(isEnabled, true);
+        }
+
+        if (_state.brightness != brightness && !_state.nightMode) { // skip change brightness in night mode
+            setBrightness(brightness);
+        }
+
+        if (_state.temperature != colorTemperature) {
+            setColorTemperature(colorTemperature);
+        }
+
+
+        _lastManualStateUpdateTime = millis();
     }
 }
 

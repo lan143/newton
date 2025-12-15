@@ -40,6 +40,7 @@ private:
     uint64_t _lastTriggerTime = 0;
     uint64_t _lastManualControlTime = 0;
     uint64_t _lastStateUpdateTime = 0;
+    uint64_t _lastManualStateUpdateTime = 0;
 
     LightState _state;
     bool _manual = false;

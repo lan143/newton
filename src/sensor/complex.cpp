@@ -46,7 +46,7 @@ void ComplexSensor::init(EDHA::Device* device, std::string stateTopic, uint8_t a
     )
         ->setStateTopic(stateTopic)
         ->setValueTemplate("{{ value_json.co2 }}")
-        ->setUnitOfMeasurement("ppb")
+        ->setUnitOfMeasurement("ppm")
         ->setDeviceClass(EDHA::deviceClassSensorAQI);
 
     _mswSensor->enableCO2Sensor(true);
