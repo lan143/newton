@@ -1,0 +1,46 @@
+#include <Json.h>
+#include <ExtStrings.h>
+#include "defines.h"
+#include "state.h"
+
+bool State::operator==(State& other)
+{
+    return (*this)._temperature == other._temperature
+        && (*this)._humidity == other._humidity
+        && (*this)._airQuality == other._airQuality
+        && (*this)._co2Value == other._co2Value
+        && (*this)._isLightNightMode == other._isLightNightMode
+        && (*this)._lightSwitchState == other._lightSwitchState
+        && (*this)._lightBrightness == other._lightBrightness
+        && (*this)._lightColor == other._lightColor
+        && (*this)._lightTempColor == other._lightTempColor;
+}
+
+std::string State::marshalJSON()
+{
+    std::string payload = EDUtils::buildJson([this](JsonObject entity) {
+        if (_temperature != -1000.0f) {
+            entity[F("temperature")] = _temperature;
+        }
+
+        if (_humidity != -1000.0f) {
+            entity[F("humidity")] = _humidity;
+        }
+
+        if (_airQuality != -1) {
+            entity[F("airQuality")] = _airQuality;
+        }
+
+        if (_co2Value != -1) {
+            entity[F("co2")] = _co2Value;
+        }
+
+        entity[F("lightNightMode")] = _isLightNightMode ? "true" : "false";
+        entity[F("lightSwitchState")] = _lightSwitchState ? "ON" : "OFF";
+        entity[F("lightBrightness")] = _lightBrightness;
+        entity[F("lightColor")] = EDUtils::formatString("%d,%d,%d", _lightColor.r, _lightColor.g, _lightColor.b);
+        entity[F("lightTempColor")] = _lightTempColor;
+    });
+
+    return payload;
+}
