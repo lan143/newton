@@ -44,6 +44,8 @@ public:
         }
     }
 
+    void setLightLevel(float_t lightLevel) { _currentState.setLightLevel(lightLevel); }
+
     void setLightNightModeState(bool enabled) { _currentState.setLightNightModeState(enabled); }
     void setLightSwitchState(bool enabled) { _currentState.setLightSwitchState(enabled); }
     void setLightBrightness(uint8_t brightness) { _currentState.setLightBrightness(brightness); }

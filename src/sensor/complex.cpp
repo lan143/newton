@@ -49,6 +49,17 @@ void ComplexSensor::init(EDHA::Device* device, std::string stateTopic, uint8_t a
         ->setUnitOfMeasurement("ppm")
         ->setDeviceClass(EDHA::deviceClassSensorAQI);
 
+    _discoveryMgr->addSensor(
+        device,
+        "Light level",
+        "lightLevel",
+        EDUtils::formatString("light_level_newton_%s", chipID)
+    )
+        ->setStateTopic(stateTopic)
+        ->setValueTemplate("{{ value_json.lightLevel }}")
+        ->setUnitOfMeasurement("lx")
+        ->setDeviceClass("illuminance");
+
     _mswSensor->enableCO2Sensor(true);
 }
 
@@ -85,5 +96,14 @@ void ComplexSensor::loop()
         }
 
         _lastCO2UpdateTime = millis();
+    }
+
+    if ((_lastLightLevelUpdateTime + 10000) < millis()) {
+        float_t level = _mswSensor->getLightLevel();
+        if (level != -1.0f) {
+            _stateMgr->setLightLevel(level);
+        }
+
+        _lastLightLevelUpdateTime = millis();
     }
 }

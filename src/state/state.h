@@ -26,6 +26,8 @@ public:
     void setCO2(int16_t co2Value) { _co2Value = co2Value; }
     int16_t getCO2() const { return _co2Value; }
 
+    void setLightLevel(float_t lightLevel) { _lightLevel = lightLevel; }
+
     void setLightNightModeState(bool enabled) { _isLightNightMode = enabled; }
     void setLightSwitchState(bool enabled) { _lightSwitchState = enabled; }
     void setLightBrightness(uint8_t brightness) { _lightBrightness = brightness; }
@@ -47,6 +49,7 @@ private:
     float_t _humidity = -1000.0f;
     int16_t _airQuality = -1;
     int16_t _co2Value = -1;
+    float_t _lightLevel = -1.0;
 
     bool _isLightNightMode = false;
     bool _lightSwitchState = false;

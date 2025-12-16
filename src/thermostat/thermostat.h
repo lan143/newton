@@ -35,6 +35,7 @@ public:
 private:
     uint8_t _relayPin = 0;
     ThermostatState _state;
+    float_t _currentTemperature = 0.0f;
     bool _isTemperatureSensorFault = false;
     uint32_t _temperatureSensorFaultCount = 0;
     unsigned long _loopLastTime = 0;

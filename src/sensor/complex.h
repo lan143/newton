@@ -29,6 +29,7 @@ private:
     unsigned long _lastClimateUpdateTime = 0;
     unsigned long _lastAirQualityUpdateTime = 0;
     unsigned long _lastCO2UpdateTime = 0;
+    unsigned long _lastLightLevelUpdateTime = 0;
 
     GKalman* _airQualityFilter;
 };

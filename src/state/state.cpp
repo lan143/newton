@@ -9,6 +9,7 @@ bool State::operator==(State& other)
         && (*this)._humidity == other._humidity
         && (*this)._airQuality == other._airQuality
         && (*this)._co2Value == other._co2Value
+        && (*this)._lightLevel == other._lightLevel
         && (*this)._isLightNightMode == other._isLightNightMode
         && (*this)._lightSwitchState == other._lightSwitchState
         && (*this)._lightBrightness == other._lightBrightness
@@ -39,6 +40,10 @@ std::string State::marshalJSON()
             entity[F("co2")] = _co2Value;
         }
 
+        if (_lightLevel != -1.0f) {
+            entity[F("lightLevel")] = _lightLevel;
+        }
+
         entity[F("lightNightMode")] = _isLightNightMode ? "true" : "false";
         entity[F("lightSwitchState")] = _lightSwitchState ? "ON" : "OFF";
         entity[F("lightBrightness")] = _lightBrightness;
@@ -57,7 +62,7 @@ std::string State::marshalJSON()
             entity[F("warmFloorSetPoint")] = _warmFloorSetPoint;
         }
 
-        entity[F("warmFloorState")] = _warmFloorState ? "true" : "false";
+        entity[F("warmFloorState")] = _warmFloorState ? "heating" : "idle";
     });
 
     return payload;

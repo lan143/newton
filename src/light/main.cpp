@@ -16,7 +16,7 @@ void MainLight::setEnabled(bool enabled)
     _led1->enableCCT1(enabled);
 }
 
-bool MainLight::isEnabled() const
+EDWB::Result<bool> MainLight::isEnabled() const
 {
     return _led1->isEnabledCCT1();
 }
@@ -26,7 +26,7 @@ void MainLight::setBrightness(uint8_t brightness)
     _led1->setBrightnessCCT1(brightness);
 }
 
-uint8_t MainLight::getBrightness() const
+EDWB::Result<uint8_t> MainLight::getBrightness() const
 {
     return _led1->getBrightnessCCT1();
 }
@@ -36,7 +36,12 @@ void MainLight::setColorTemperature(uint32_t colorTemp)
     _led1->setTemperatureCCT1(map(colorTemp, 2700, 6000, 0, 100));
 }
 
-uint32_t MainLight::getColorTemperature() const
+EDWB::Result<uint32_t> MainLight::getColorTemperature() const
 {
-    return map(_led1->getTemperatureCCT1(), 0, 100, 2700, 6000);
+    auto result = _led1->getTemperatureCCT1();
+    if (!result._success) {
+        return EDWB::Result<uint32_t>(false, 0);
+    }
+
+    return EDWB::Result<uint32_t>(true, map(result._value, 0, 100, 2700, 6000));
 }

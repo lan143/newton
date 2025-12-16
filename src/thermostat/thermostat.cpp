@@ -8,8 +8,10 @@
 
 void Thermostat::init(EDHA::Device* device, std::string stateTopic, std::string commandTopic, uint8_t relayPin)
 {
-    _relayPin = relayPin;
     _state = _configMgr->getConfig().thermostatState;
+    _stateMgr->setWarmFloorState(_state.isActive);
+
+    _relayPin = relayPin;
     pinMode(_relayPin, OUTPUT);
 
     if (_state.isActive) {
@@ -88,19 +90,19 @@ void Thermostat::loop()
         float_t temperature = _oneWireModbus->getWarmFloorTemperature();
         bool isActiveChange = false;
 
-        if (temperature != -1000.0f) {
+        if (temperature != -1000.0f && (_currentTemperature == 0.0f || abs(temperature - _currentTemperature) < 5.0f)) {
             _isTemperatureSensorFault = false;
             _temperatureSensorFaultCount = 0;
 
             if (_state.mode == THERMOSTAT_MODE_HEAT) {
-                if ((_state.setPoint - temperature) > 1.0f) {
+                if ((temperature < _state.setPoint) && (_state.setPoint - temperature) > 1.0f) {
                     digitalWrite(_relayPin, HIGH);
 
                     if (!_state.isActive) {
                         _state.isActive = true;
                         isActiveChange = true;
                     }
-                } else if ((temperature - _state.setPoint) > 1.0f) {
+                } else if ((temperature > _state.setPoint) && (temperature - _state.setPoint) > 1.0f) {
                     digitalWrite(_relayPin, LOW);
 
                     if (_state.isActive) {
@@ -118,6 +120,7 @@ void Thermostat::loop()
             }
 
             _stateMgr->setWarmFloorCurrentTemperature(temperature);
+            _currentTemperature = temperature;
         } else {
             _temperatureSensorFaultCount++;
             if (_temperatureSensorFaultCount > 20) {

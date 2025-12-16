@@ -133,22 +133,16 @@ void LightAutomation::loop()
     }
 
     if ((_lastManualStateUpdateTime + 500) < millis()) {
-        bool isEnabled = _main->isEnabled();
-        uint8_t brightness = _main->getBrightness();
-        uint32_t colorTemperature = _main->getColorTemperature();
+        auto isEnabled = _main->isEnabled();
+        auto brightness = _main->getBrightness();
 
-        if (_state.enabled != isEnabled) {
-            changeStateInternal(isEnabled, true);
+        if (isEnabled._success && _state.enabled != isEnabled._value) {
+            changeStateInternal(isEnabled._value, true);
         }
 
-        if (_state.brightness != brightness && !_state.nightMode) { // skip change brightness in night mode
-            setBrightness(brightness);
+        if (brightness._success && _state.brightness != brightness._value && !_state.nightMode) { // skip change brightness in night mode
+            setBrightness(brightness._value);
         }
-
-        if (_state.temperature != colorTemperature) {
-            setColorTemperature(colorTemperature);
-        }
-
 
         _lastManualStateUpdateTime = millis();
     }

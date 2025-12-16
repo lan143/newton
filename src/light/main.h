@@ -12,13 +12,13 @@ public:
     void init(uint8_t address);
 
     void setEnabled(bool enabled);
-    bool isEnabled() const;
+    EDWB::Result<bool> isEnabled() const;
 
     void setBrightness(uint8_t brightness);
-    uint8_t getBrightness() const;
+    EDWB::Result<uint8_t> getBrightness() const;
 
     void setColorTemperature(uint32_t colorTemp);
-    uint32_t getColorTemperature() const;
+    EDWB::Result<uint32_t> getColorTemperature() const;
 
 private:
     EDWB::WirenBoard* _modbus = NULL;

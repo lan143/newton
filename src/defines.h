@@ -9,8 +9,8 @@
 #define ETH_TYPE      ETH_PHY_LAN8720
 #define ETH_CLK_MODE  ETH_CLOCK_GPIO17_OUT
 
-#define RELAY_UNKNOW 2
-#define RELAY_WARM_FLOOR 15 
+#define RELAY_WARM_FLOOR 2
+#define RELAY_UNKNOW 15
 
 #define RS485RX  35
 #define RS485TX  32
