@@ -32,6 +32,11 @@ public:
     void setLightColor(CRGB color) { _lightColor = color; }
     void setLightTempColor(uint16_t temperature) { _lightTempColor = temperature; }
 
+    void setWarmFloorCurrentTemperature(float_t temperature) { _warmFloorCurrentTemperature = temperature; }
+    void setWarmFloorMode(std::string mode) { _warmFloorMode = mode; }
+    void setWarmFloorSetPoint(float_t setPoint) { _warmFloorSetPoint = setPoint; }
+    void setWarmFloorState(bool isActive) { _warmFloorState = isActive; }
+
     bool isValid() const
     {
         return _temperature != -1000.0f && _humidity != -1000.0f && _airQuality != -1;
@@ -48,4 +53,9 @@ private:
     uint8_t _lightBrightness = 0;
     CRGB _lightColor;
     uint16_t _lightTempColor = 0;
+
+    float_t _warmFloorCurrentTemperature = -1000.0f;
+    std::string _warmFloorMode = "";
+    float_t _warmFloorSetPoint = -1000.0f;
+    bool _warmFloorState = false;
 };

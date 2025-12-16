@@ -45,6 +45,16 @@ bool Command::unmarshalJSON(const char* data)
             }
         }
 
+        if (root.containsKey(F("warmFloorMode"))) {
+            _hasWarmFloorMode = true;
+            _warmFloorMode.assign(root[F("warmFloorMode")].as<const char*>());
+        }
+
+        if (root.containsKey(F("warmFloorSetPoint"))) {
+            _hasWarmFloorSetPoint = true;
+            _warmFloorSetPoint = root[F("warmFloorSetPoint")].as<float>();
+        }
+
         return true;
     });
 }

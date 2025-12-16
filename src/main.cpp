@@ -22,6 +22,8 @@
 #include "state/producer.h"
 #include "state/state_mgr.h"
 #include "sensor/complex.h"
+#include "sensor/one_wire.h"
+#include "thermostat/thermostat.h"
 #include "web/handler.h"
 
 EDConfig::ConfigMgr<Config> configMgr(EEPROM_SIZE);
@@ -38,11 +40,14 @@ MainLight mainLight(&modbus);
 Backlight backlight(&modbus);
 
 ComplexSensor complexSensor(&discoveryMgr, &stateMgr, &modbus);
+OneWire oneWireModbus(&modbus);
+
+Thermostat warmFloor(&configMgr, &discoveryMgr, &stateMgr, &oneWireModbus);
 
 LightAutomation lightAutomation(&configMgr, &discoveryMgr, &backlight, &mainLight, &stateMgr);
 
 SwitchCommandConsumer lightSwitchConsumer(&lightAutomation);
-CommandConsumer commandConsumer(&lightAutomation);
+CommandConsumer commandConsumer(&lightAutomation, &warmFloor);
 
 Handler handler(&configMgr, &networkMgr, &stateMgr, &healthCheck, &modbus);
 
@@ -67,6 +72,7 @@ void setup()
         config.addressWBMSW = 1;
         config.addressWBLED1 = 3;
         config.addressWBLED2 = 4;
+        config.addressWBM1W2 = 5;
     });
     configMgr.load();
 
@@ -114,11 +120,15 @@ void setup()
     mqtt.subscribe(&lightSwitchConsumer);
 
     complexSensor.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressWBMSW);
+    oneWireModbus.init(configMgr.getConfig());
 
     mainLight.init(configMgr.getConfig().addressWBLED1);
     backlight.init(configMgr.getConfig().addressWBLED2);
 
     lightAutomation.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().mqttCommandTopic, configMgr.getConfig().mqttLightSwitchCommandTopic);
+
+    warmFloor.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().mqttCommandTopic, RELAY_WARM_FLOOR);
+    healthCheck.registerService(&warmFloor);
 
     ESP_LOGI("setup", "complete");
 }
@@ -132,4 +142,5 @@ void loop()
     complexSensor.loop();
     stateMgr.loop();
     lightAutomation.loop();
+    warmFloor.loop();
 }

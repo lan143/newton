@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <mqtt_config.h>
 #include "automation/light_state.h"
+#include "thermostat/state.h"
 
 #define CURRENT_VERSION 1
 
@@ -43,7 +44,10 @@ struct Config
     uint8_t addressWBMSW = 0;
     uint8_t addressWBLED1 = 0;
     uint8_t addressWBLED2 = 0;
+    uint8_t addressWBM1W2 = 0;
 
     // Light
     LightState lightState;
+
+    ThermostatState thermostatState;
 };

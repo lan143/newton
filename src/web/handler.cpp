@@ -43,6 +43,7 @@ void Handler::init()
             entity["addressWBMSW"] = config.addressWBMSW;
             entity["addressWBLED1"] = config.addressWBLED1;
             entity["addressWBLED2"] = config.addressWBLED2;
+            entity["addressWBM1W2"] = config.addressWBM1W2;
         });
 
         response->write(payload.c_str());
@@ -65,6 +66,7 @@ void Handler::init()
         const AsyncWebParameter* addressWBMSWParam = request->getParam("addressWBMSW", true);
         const AsyncWebParameter* addressWBLED1Param = request->getParam("addressWBLED1", true);
         const AsyncWebParameter* addressWBLED2Param = request->getParam("addressWBLED2", true);
+        const AsyncWebParameter* addressWBM1W2Param = request->getParam("addressWBM1W2", true);
 
         int modbusSpeed;
         if (EDUtils::str2int(&modbusSpeed, modbusSpeedParam->value().c_str(), 10) != EDUtils::STR2INT_SUCCESS) {
@@ -115,6 +117,13 @@ void Handler::init()
             return;
         }
 
+        int addressWBM1W2;
+        if (EDUtils::str2int(&addressWBM1W2, addressWBM1W2Param->value().c_str(), 10) != EDUtils::STR2INT_SUCCESS
+            || addressWBM1W2 < 1 || addressWBM1W2 > 254) {
+            request->send(422, "application/json", "{\"message\": \"Incorrect address WB-M1W2\"}");
+            return;
+        }
+
         Config& config = _configMgr->getConfig();
         if (modbusSpeed != config.modbusSpeed) {
             _modbus->changeSpeed(modbusSpeed);
@@ -124,6 +133,7 @@ void Handler::init()
         config.addressWBMSW = addressWBMSW;
         config.addressWBLED1 = addressWBLED1;
         config.addressWBLED2 = addressWBLED2;
+        config.addressWBM1W2 = addressWBM1W2;
 
         _configMgr->store();
 

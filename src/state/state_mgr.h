@@ -50,6 +50,11 @@ public:
     void setLightColor(CRGB color) { _currentState.setLightColor(color); }
     void setLightTempColor(uint16_t temp) {_currentState.setLightTempColor(temp); }
 
+    void setWarmFloorCurrentTemperature(float_t temperature) { _currentState.setWarmFloorCurrentTemperature(temperature); }
+    void setWarmFloorMode(std::string mode) { _currentState.setWarmFloorMode(mode); }
+    void setWarmFloorSetPoint(float_t setPoint) { _currentState.setWarmFloorSetPoint(setPoint); }
+    void setWarmFloorState(bool isActive) { _currentState.setWarmFloorState(isActive); }
+
 private:
     State _currentState;
     State _prevState;

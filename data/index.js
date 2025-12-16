@@ -50,6 +50,7 @@ function loadModbusSettings() {
             $('form#modbus-settings input[name=addressWBMSW]').val(data.addressWBMSW);
             $('form#modbus-settings input[name=addressWBLED1]').val(data.addressWBLED1);
             $('form#modbus-settings input[name=addressWBLED2]').val(data.addressWBLED2);
+            $('form#modbus-settings input[name=addressWBM1W2]').val(data.addressWBM1W2);
         },
         error: function (xhr, str) {
             alert('Errors while loading settings');
@@ -175,7 +176,8 @@ $(function() {
                 modbusSpeed: $(this).find('select[name=modbusSpeed]').val(),
                 addressWBMSW: $(this).find('input[name=addressWBMSW]').val(),
                 addressWBLED1: $(this).find('input[name=addressWBLED1]').val(),
-                addressWBLED2: $(this).find('input[name=addressWBLED2]').val()
+                addressWBLED2: $(this).find('input[name=addressWBLED2]').val(),
+                addressWBM1W2: $(this).find('input[name=addressWBM1W2]').val(),
             },
             success: function (data) {
                 alert('Modbus settings successful changed. Reboot...');

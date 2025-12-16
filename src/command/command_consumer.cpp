@@ -37,4 +37,12 @@ void CommandConsumer::consume(std::string payload)
 
         _lightAutomation->setColorTemperature(temperature);
     }
+
+    if (command.hasWarmFloorMode()) {
+        _warmFloor->changeMode(command.getWarmFloorMode());
+    }
+
+    if (command.hasWarmFloorSetPoint()) {
+        _warmFloor->changeSetPoint(command.getWarmFloorSetPoint());
+    }
 }

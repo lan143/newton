@@ -13,7 +13,11 @@ bool State::operator==(State& other)
         && (*this)._lightSwitchState == other._lightSwitchState
         && (*this)._lightBrightness == other._lightBrightness
         && (*this)._lightColor == other._lightColor
-        && (*this)._lightTempColor == other._lightTempColor;
+        && (*this)._lightTempColor == other._lightTempColor
+        && (*this)._warmFloorCurrentTemperature == other._warmFloorCurrentTemperature
+        && (*this)._warmFloorMode == other._warmFloorMode
+        && (*this)._warmFloorSetPoint == other._warmFloorSetPoint
+        && (*this)._warmFloorState == other._warmFloorState;
 }
 
 std::string State::marshalJSON()
@@ -40,6 +44,20 @@ std::string State::marshalJSON()
         entity[F("lightBrightness")] = _lightBrightness;
         entity[F("lightColor")] = EDUtils::formatString("%d,%d,%d", _lightColor.r, _lightColor.g, _lightColor.b);
         entity[F("lightColorTemp")] = _lightTempColor;
+
+        if (_warmFloorCurrentTemperature != -1000.0f) {
+            entity[F("warmFloorCurrentTemperature")] = _warmFloorCurrentTemperature;
+        }
+
+        if (_warmFloorMode.length() > 0) {
+            entity[F("warmFloorMode")] = _warmFloorMode;
+        }
+
+        if (_warmFloorSetPoint != -1000.0f) {
+            entity[F("warmFloorSetPoint")] = _warmFloorSetPoint;
+        }
+
+        entity[F("warmFloorState")] = _warmFloorState ? "true" : "false";
     });
 
     return payload;
