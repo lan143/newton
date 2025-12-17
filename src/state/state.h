@@ -39,17 +39,12 @@ public:
     void setWarmFloorSetPoint(float_t setPoint) { _warmFloorSetPoint = setPoint; }
     void setWarmFloorState(bool isActive) { _warmFloorState = isActive; }
 
-    bool isValid() const
-    {
-        return _temperature != -1000.0f && _humidity != -1000.0f && _airQuality != -1;
-    }
-
 private:
     float_t _temperature = -1000.0f;
     float_t _humidity = -1000.0f;
     int16_t _airQuality = -1;
     int16_t _co2Value = -1;
-    float_t _lightLevel = -1.0;
+    float_t _lightLevel = -1.0f;
 
     bool _isLightNightMode = false;
     bool _lightSwitchState = false;

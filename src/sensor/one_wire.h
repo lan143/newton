@@ -11,7 +11,7 @@ public:
     OneWire(EDWB::WirenBoard* modbus) : _modbus(modbus) {}
     void init(Config config);
 
-    float_t getWarmFloorTemperature() const { return _m1w2->getTemperature(1); }
+    EDWB::Result<float_t> getWarmFloorTemperature() const { return _m1w2->getTemperature(1); }
 
 private:
     EDWB::WirenBoard* _modbus = NULL;

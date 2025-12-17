@@ -66,23 +66,23 @@ void ComplexSensor::init(EDHA::Device* device, std::string stateTopic, uint8_t a
 void ComplexSensor::loop()
 {
     if ((_lastClimateUpdateTime + 10000) < millis()) {
-        float_t temperature = _mswSensor->getTemperature();
-        if (temperature > -40.0f && temperature < 80.0f) {
-            _stateMgr->setTemperature(_mswSensor->getTemperature());
+        auto temperature = _mswSensor->getTemperature();
+        if (temperature._success) {
+            _stateMgr->setTemperature(temperature._value);
         }
 
-        float_t humidity = _mswSensor->getHumidity();
-        if (humidity > 0.0f) {
-            _stateMgr->setHumidity(_mswSensor->getHumidity());
+        auto humidity = _mswSensor->getHumidity();
+        if (humidity._success) {
+            _stateMgr->setHumidity(humidity._value);
         }
 
         _lastClimateUpdateTime = millis();
     }
 
     if ((_lastAirQualityUpdateTime + 1000) < millis()) {
-        int16_t airQualityRaw = _mswSensor->getAirQuality();
-        if (airQualityRaw != 0) {
-            int16_t airQualiy = _airQualityFilter->filtered(airQualityRaw);
+        auto airQualityRaw = _mswSensor->getAirQuality();
+        if (airQualityRaw._success) {
+            int16_t airQualiy = _airQualityFilter->filtered(airQualityRaw._value);
             _stateMgr->setAirQuality(airQualiy);
         }
 
@@ -90,18 +90,18 @@ void ComplexSensor::loop()
     }
 
     if ((_lastCO2UpdateTime + 1000) < millis()) {
-        int16_t co2Value = _mswSensor->getCO2Value();
-        if (co2Value > 0) {
-            _stateMgr->setCO2(co2Value);
+        auto co2Value = _mswSensor->getCO2Value();
+        if (co2Value._success) {
+            _stateMgr->setCO2(co2Value._value);
         }
 
         _lastCO2UpdateTime = millis();
     }
 
     if ((_lastLightLevelUpdateTime + 10000) < millis()) {
-        float_t level = _mswSensor->getLightLevel();
-        if (level != -1.0f) {
-            _stateMgr->setLightLevel(level);
+        auto level = _mswSensor->getLightLevel();
+        if (level._success) {
+            _stateMgr->setLightLevel(level._value);
         }
 
         _lastLightLevelUpdateTime = millis();

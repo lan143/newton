@@ -9,6 +9,20 @@
 void Thermostat::init(EDHA::Device* device, std::string stateTopic, std::string commandTopic, uint8_t relayPin)
 {
     _state = _configMgr->getConfig().thermostatState;
+    if (_state.setPoint < MIN_TEMPERATURE || MIN_TEMPERATURE > MAX_TEMPERATURE) {
+        _state.setPoint = 20.0f;
+    }
+    _stateMgr->setWarmFloorSetPoint(_state.setPoint);
+
+    switch (_state.mode) {
+    case THERMOSTAT_MODE_OFF:
+        _stateMgr->setWarmFloorMode(EDHA::mapMode(EDHA::MODE_OFF));
+        break;
+    case THERMOSTAT_MODE_HEAT:
+        _stateMgr->setWarmFloorMode(EDHA::mapMode(EDHA::MODE_HEAT));
+        break;
+    }
+
     _stateMgr->setWarmFloorState(_state.isActive);
 
     _relayPin = relayPin;
@@ -87,22 +101,22 @@ void Thermostat::changeSetPoint(float_t setPoint)
 void Thermostat::loop()
 {
     if ((_loopLastTime + 2000) < millis()) {
-        float_t temperature = _oneWireModbus->getWarmFloorTemperature();
+        auto temperature = _oneWireModbus->getWarmFloorTemperature();
         bool isActiveChange = false;
 
-        if (temperature != -1000.0f && (_currentTemperature == 0.0f || abs(temperature - _currentTemperature) < 5.0f)) {
+        if (temperature._success && (_currentTemperature == 0.0f || abs(temperature._value - _currentTemperature) < 5.0f)) {
             _isTemperatureSensorFault = false;
             _temperatureSensorFaultCount = 0;
 
             if (_state.mode == THERMOSTAT_MODE_HEAT) {
-                if ((temperature < _state.setPoint) && (_state.setPoint - temperature) > 1.0f) {
+                if ((temperature._value < _state.setPoint) && (_state.setPoint - temperature._value) > 1.0f) {
                     digitalWrite(_relayPin, HIGH);
 
                     if (!_state.isActive) {
                         _state.isActive = true;
                         isActiveChange = true;
                     }
-                } else if ((temperature > _state.setPoint) && (temperature - _state.setPoint) > 1.0f) {
+                } else if ((temperature._value > _state.setPoint) && (temperature._value - _state.setPoint) > 1.0f) {
                     digitalWrite(_relayPin, LOW);
 
                     if (_state.isActive) {
@@ -119,8 +133,8 @@ void Thermostat::loop()
                 }
             }
 
-            _stateMgr->setWarmFloorCurrentTemperature(temperature);
-            _currentTemperature = temperature;
+            _stateMgr->setWarmFloorCurrentTemperature(temperature._value);
+            _currentTemperature = temperature._value;
         } else {
             _temperatureSensorFaultCount++;
             if (_temperatureSensorFaultCount > 20) {
