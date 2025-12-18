@@ -51,6 +51,7 @@ function loadModbusSettings() {
             $('form#modbus-settings input[name=addressWBLED1]').val(data.addressWBLED1);
             $('form#modbus-settings input[name=addressWBLED2]').val(data.addressWBLED2);
             $('form#modbus-settings input[name=addressWBM1W2]').val(data.addressWBM1W2);
+            $('form#modbus-settings input[name=addressMTD262MB]').val(data.addressMTD262MB);
         },
         error: function (xhr, str) {
             alert('Errors while loading settings');
@@ -178,6 +179,7 @@ $(function() {
                 addressWBLED1: $(this).find('input[name=addressWBLED1]').val(),
                 addressWBLED2: $(this).find('input[name=addressWBLED2]').val(),
                 addressWBM1W2: $(this).find('input[name=addressWBM1W2]').val(),
+                addressMTD262MB: $(this).find('input[name=addressMTD262MB]').val(),
             },
             success: function (data) {
                 alert('Modbus settings successful changed. Reboot...');

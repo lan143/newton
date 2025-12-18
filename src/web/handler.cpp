@@ -44,6 +44,8 @@ void Handler::init()
             entity["addressWBLED1"] = config.addressWBLED1;
             entity["addressWBLED2"] = config.addressWBLED2;
             entity["addressWBM1W2"] = config.addressWBM1W2;
+
+            entity["addressMTD262MB"] = config.addressMTD262MB;
         });
 
         response->write(payload.c_str());
@@ -57,6 +59,8 @@ void Handler::init()
             || !request->hasParam("addressWBMSW", true)
             || !request->hasParam("addressWBLED1", true)
             || !request->hasParam("addressWBLED2", true)
+            || !request->hasParam("addressWBM1W2", true)
+            || !request->hasParam("addressMTD262MB", true)
         ) {
             request->send(422, "application/json", "{\"message\": \"not present modbus params in request\"}");
             return;
@@ -67,6 +71,8 @@ void Handler::init()
         const AsyncWebParameter* addressWBLED1Param = request->getParam("addressWBLED1", true);
         const AsyncWebParameter* addressWBLED2Param = request->getParam("addressWBLED2", true);
         const AsyncWebParameter* addressWBM1W2Param = request->getParam("addressWBM1W2", true);
+
+        const AsyncWebParameter* addressMTD262MBParam = request->getParam("addressMTD262MB", true);
 
         int modbusSpeed;
         if (EDUtils::str2int(&modbusSpeed, modbusSpeedParam->value().c_str(), 10) != EDUtils::STR2INT_SUCCESS) {
@@ -124,6 +130,13 @@ void Handler::init()
             return;
         }
 
+        int addressMTD262MB;
+        if (EDUtils::str2int(&addressMTD262MB, addressMTD262MBParam->value().c_str(), 10) != EDUtils::STR2INT_SUCCESS
+            || addressMTD262MB < 1 || addressMTD262MB > 254) {
+            request->send(422, "application/json", "{\"message\": \"Incorrect address MTD262MB 1\"}");
+            return;
+        }
+
         Config& config = _configMgr->getConfig();
         if (modbusSpeed != config.modbusSpeed) {
             _modbus->changeSpeed(modbusSpeed);
@@ -134,6 +147,7 @@ void Handler::init()
         config.addressWBLED1 = addressWBLED1;
         config.addressWBLED2 = addressWBLED2;
         config.addressWBM1W2 = addressWBM1W2;
+        config.addressMTD262MB = addressMTD262MB;
 
         _configMgr->store();
 

@@ -57,6 +57,13 @@ public:
     void setWarmFloorSetPoint(float_t setPoint) { _currentState.setWarmFloorSetPoint(setPoint); }
     void setWarmFloorState(bool isActive) { _currentState.setWarmFloorState(isActive); }
 
+    void updateHumanDetected(uint8_t id, bool isDetected)
+    {
+        if (id == 1) {
+            _currentState.updateHumanDetected1(isDetected);
+        }
+    }
+
 private:
     State _currentState;
     State _prevState;

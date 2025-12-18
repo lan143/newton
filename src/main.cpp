@@ -22,6 +22,7 @@
 #include "state/producer.h"
 #include "state/state_mgr.h"
 #include "sensor/complex.h"
+#include "sensor/mtd262mb.h"
 #include "sensor/one_wire.h"
 #include "thermostat/thermostat.h"
 #include "web/handler.h"
@@ -40,6 +41,7 @@ MainLight mainLight(&modbus);
 Backlight backlight(&modbus);
 
 ComplexSensor complexSensor(&discoveryMgr, &stateMgr, &modbus);
+MTD262MB mtd262mb(modbus.getClient(), &discoveryMgr, &stateMgr);
 OneWire oneWireModbus(&modbus);
 
 Thermostat warmFloor(&configMgr, &discoveryMgr, &stateMgr, &oneWireModbus);
@@ -73,6 +75,7 @@ void setup()
         config.addressWBLED1 = 3;
         config.addressWBLED2 = 4;
         config.addressWBM1W2 = 5;
+        config.addressMTD262MB = 6;
     });
     configMgr.load();
 
@@ -120,6 +123,8 @@ void setup()
     mqtt.subscribe(&lightSwitchConsumer);
 
     complexSensor.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressWBMSW);
+    mtd262mb.init(device, configMgr.getConfig().mqttStateTopic, 1, configMgr.getConfig().addressMTD262MB);
+    healthCheck.registerService(&mtd262mb);
     oneWireModbus.init(configMgr.getConfig());
 
     mainLight.init(configMgr.getConfig().addressWBLED1);
@@ -143,4 +148,5 @@ void loop()
     stateMgr.loop();
     lightAutomation.loop();
     warmFloor.loop();
+    mtd262mb.loop();
 }

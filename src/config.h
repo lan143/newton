@@ -45,6 +45,7 @@ struct Config
     uint8_t addressWBLED1 = 0;
     uint8_t addressWBLED2 = 0;
     uint8_t addressWBM1W2 = 0;
+    uint8_t addressMTD262MB = 0;
 
     // Light
     LightState lightState;

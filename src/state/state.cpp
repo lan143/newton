@@ -63,6 +63,8 @@ std::string State::marshalJSON()
         }
 
         entity[F("warmFloorState")] = _warmFloorState ? "heating" : "idle";
+
+        entity[F("humanDetected1")] = _isHumanDetected1 ? "true" : "false";
     });
 
     return payload;

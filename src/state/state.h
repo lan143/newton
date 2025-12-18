@@ -39,6 +39,8 @@ public:
     void setWarmFloorSetPoint(float_t setPoint) { _warmFloorSetPoint = setPoint; }
     void setWarmFloorState(bool isActive) { _warmFloorState = isActive; }
 
+    void updateHumanDetected1(bool isDetected) { _isHumanDetected1 = isDetected; }
+
 private:
     float_t _temperature = -1000.0f;
     float_t _humidity = -1000.0f;
@@ -56,4 +58,6 @@ private:
     std::string _warmFloorMode = "";
     float_t _warmFloorSetPoint = -1000.0f;
     bool _warmFloorState = false;
+
+    bool _isHumanDetected1 = false;
 };
