@@ -13,17 +13,15 @@
 
 #include "config.h"
 #include "network/network.h"
-#include "state/state_mgr.h"
 
 class Handler {
 public:
     Handler(
         EDConfig::ConfigMgr<Config>* configMgr,
         NetworkMgr* networkMgr,
-        StateMgr* stateMgr,
         EDHealthCheck::HealthCheck* healthCheck,
         EDWB::WirenBoard* modbus
-    ) : _configMgr(configMgr), _networkMgr(networkMgr), _stateMgr(stateMgr),
+    ) : _configMgr(configMgr), _networkMgr(networkMgr),
         _healthCheck(healthCheck), _modbus(modbus) {
         _server = new AsyncWebServer(80);
     }
@@ -34,7 +32,6 @@ private:
     AsyncWebServer* _server;
     EDConfig::ConfigMgr<Config>* _configMgr;
     NetworkMgr* _networkMgr;
-    StateMgr* _stateMgr;
     EDHealthCheck::HealthCheck* _healthCheck;
     EDWB::WirenBoard* _modbus;
 };

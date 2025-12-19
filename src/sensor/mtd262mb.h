@@ -3,8 +3,9 @@
 #include <iarduino_Modbus.h>
 #include <discovery.h>
 #include <ready.h>
+#include <state/state_mgr.h>
 
-#include "state/state_mgr.h"
+#include "state/state.h"
 
 class MTD262MB : public EDHealthCheck::Ready
 {
@@ -12,7 +13,7 @@ public:
     MTD262MB(
         ModbusClient* client,
         EDHA::DiscoveryMgr* discoveryMgr,
-        StateMgr* stateMgr
+        EDUtils::StateMgr<State>* stateMgr
     ) : _client(client), _discoveryMgr(discoveryMgr), _stateMgr(stateMgr) {}
 
     void init(EDHA::Device* device, std::string stateTopic, uint8_t id, uint8_t address);
@@ -36,5 +37,5 @@ private:
 private:
     ModbusClient* _client;
     EDHA::DiscoveryMgr* _discoveryMgr;
-    StateMgr* _stateMgr;
+    EDUtils::StateMgr<State>* _stateMgr;
 };

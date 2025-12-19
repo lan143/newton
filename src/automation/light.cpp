@@ -1,3 +1,5 @@
+#include <Utils.h>
+
 #include "light.h"
 
 void LightAutomation::init(EDHA::Device* device, std::string stateTopic, std::string commandTopic, std::string switchCommandTopic)
@@ -55,7 +57,7 @@ void LightAutomation::init(EDHA::Device* device, std::string stateTopic, std::st
 
 void LightAutomation::changeState(bool enabled)
 {
-    changeStateInternal(enabled, true);
+    changeStateInternal(enabled, enabled ? false : true); // we enable manual mode only when light disabled by switch or mqtt
 }
 
 void LightAutomation::setColor(CRGB color)
@@ -80,12 +82,12 @@ void LightAutomation::changeNightModeState(bool enabled)
 {
     _state.nightMode = enabled;
     update();
-    _stateMgr->setLightNightModeState(enabled);
+    _stateMgr->getState().setLightNightModeState(enabled);
 }
 
 void LightAutomation::changeStateInternal(bool enabled, bool manual)
 {
-    if (_state.enabled == enabled && _manual == manual) {
+    if (_state.enabled == enabled) {
         return;
     }
 
@@ -101,22 +103,36 @@ void LightAutomation::changeStateInternal(bool enabled, bool manual)
 
 void LightAutomation::loop()
 {
-    /*if (!_manual && (_lastCheckTime + 500) < millis()) {
-        if (_stateMgr->getCurrentState().isToiletDoorOpen() || _stateMgr->getCurrentState().isMotionDetected()) {
-            changeStateInternal(true, false);
-            _lastTriggerTime = millis();
-        } else if (_state.enabled && (_lastTriggerTime + 60000) < millis()) {
-            changeStateInternal(false, false);
+    if ((_lastCheckTime + 500) < millis()) {
+        auto isEnabled = _main->isEnabled();
+        auto brightness = _main->getBrightness();
+
+        if (isEnabled._success && _state.enabled != isEnabled._value) {
+            changeStateInternal(isEnabled._value, true);
+        }
+
+        if (brightness._success && _state.brightness != brightness._value && !_state.nightMode) { // skip change brightness in night mode
+            setBrightness(brightness._value);
+        }
+
+        // enable light if human detected, manual mode isnt active and light level < 200 lx
+        if (_stateMgr->getState().isHumanDetected1().Valid() && _stateMgr->getState().getLightLevel().Valid()) {
+            if (_stateMgr->getState().isHumanDetected1().Value() && !_manual) {
+                if (_stateMgr->getState().getLightLevel().Value() < 200.0f) {
+                    changeStateInternal(true, false);
+                }
+            } else {
+                changeStateInternal(false, false);
+            }
         }
 
         _lastCheckTime = millis();
-    }*/
+    }
 
-    // disable manual mode after 10 minutes
-    /*if (_manual && ((_lastManualControlTime + 600000) < millis())) {
+    // disable manual mode after 1 hour last manual action
+    if (_manual && (_lastManualControlTime + 3600000) < millis()) {
         _manual = false;
-        _lastManualControlTime = 0;
-    }*/
+    }
 
     if ((_lastStateUpdateTime + 60000) < millis()) {
         if (_configMgr->getConfig().lightState.enabled != _state.enabled
@@ -131,32 +147,23 @@ void LightAutomation::loop()
 
         _lastStateUpdateTime = millis();
     }
-
-    if ((_lastManualStateUpdateTime + 500) < millis()) {
-        auto isEnabled = _main->isEnabled();
-        auto brightness = _main->getBrightness();
-
-        if (isEnabled._success && _state.enabled != isEnabled._value) {
-            changeStateInternal(isEnabled._value, true);
-        }
-
-        if (brightness._success && _state.brightness != brightness._value && !_state.nightMode) { // skip change brightness in night mode
-            setBrightness(brightness._value);
-        }
-
-        _lastManualStateUpdateTime = millis();
-    }
 }
 
 void LightAutomation::update()
 {
-    _main->setEnabled(!_state.nightMode ? _state.enabled : false);
+    // temporary commented while backlight isnt installed
+    //_main->setEnabled(!_state.nightMode ? _state.enabled : false);
+    _main->setEnabled(_state.enabled);
     _backlight->setEnabled(_state.enabled);
 
     if (_state.enabled) {
         if (_state.nightMode) {
             _backlight->setColor(0xff0000);
             _backlight->setBrightness(10); // 10% of max
+
+            // temporary while backlight isnt installed
+            _main->setColorTemperature(2700);
+            _main->setBrightness(5); // 5% of max
         } else {
             _main->setColorTemperature(_state.temperature);
             _main->setBrightness(_state.brightness);
@@ -166,8 +173,8 @@ void LightAutomation::update()
         }
     }
 
-    _stateMgr->setLightSwitchState(_state.enabled);
-    _stateMgr->setLightBrightness(_state.brightness);
-    _stateMgr->setLightColor(_state.color);
-    _stateMgr->setLightTempColor(_state.temperature);
+    _stateMgr->getState().setLightSwitchState(_state.enabled);
+    _stateMgr->getState().setLightBrightness(_state.brightness);
+    _stateMgr->getState().setLightColor(_state.color);
+    _stateMgr->getState().setLightTempColor(_state.temperature);
 }

@@ -4,14 +4,16 @@
 #include <discovery.h>
 #include <wirenboard.h>
 #include <device/wb_msw.h>
-#include "state/state_mgr.h"
+#include <state/state_mgr.h>
+
+#include "state/state.h"
 
 class ComplexSensor
 {
 public:
     ComplexSensor(
         EDHA::DiscoveryMgr* discoveryMgr,
-        StateMgr* stateMgr,
+        EDUtils::StateMgr<State>* stateMgr,
         EDWB::WirenBoard* modbus
     ) : _discoveryMgr(discoveryMgr), _stateMgr(stateMgr), _modbus(modbus) {
         _airQualityFilter = new GKalman(50, 0.7f);
@@ -22,7 +24,7 @@ public:
 
 private:
     EDHA::DiscoveryMgr* _discoveryMgr;
-    StateMgr* _stateMgr;
+    EDUtils::StateMgr<State>* _stateMgr;
     EDWB::WirenBoard* _modbus;
     EDWB::MSW* _mswSensor;
 

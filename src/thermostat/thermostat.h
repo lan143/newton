@@ -6,7 +6,7 @@
 #include <ready.h>
 
 #include "sensor/one_wire.h"
-#include "state.h"
+#include "state/state.h"
 
 class Thermostat : public EDHealthCheck::Ready
 {
@@ -14,7 +14,7 @@ public:
     Thermostat(
         EDConfig::ConfigMgr<Config>* configMgr,
         EDHA::DiscoveryMgr* discoveryMgr,
-        StateMgr* stateMgr,
+        EDUtils::StateMgr<State>* stateMgr,
         OneWire* oneWireModbus
     ) : _configMgr(configMgr), _discoveryMgr(discoveryMgr), _stateMgr(stateMgr), _oneWireModbus(oneWireModbus) {}
     void init(EDHA::Device* device, std::string stateTopic, std::string commandTopic, uint8_t relayPin);
@@ -43,6 +43,6 @@ private:
 private:
     EDConfig::ConfigMgr<Config>* _configMgr = NULL;
     EDHA::DiscoveryMgr* _discoveryMgr = NULL;
-    StateMgr* _stateMgr = NULL;
+    EDUtils::StateMgr<State>* _stateMgr = NULL;
     OneWire* _oneWireModbus = NULL;
 };

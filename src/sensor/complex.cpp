@@ -1,3 +1,4 @@
+#include <Utils.h>
 #include "sensor/complex.h"
 
 void ComplexSensor::init(EDHA::Device* device, std::string stateTopic, uint8_t address)
@@ -68,12 +69,12 @@ void ComplexSensor::loop()
     if ((_lastClimateUpdateTime + 10000) < millis()) {
         auto temperature = _mswSensor->getTemperature();
         if (temperature._success) {
-            _stateMgr->setTemperature(temperature._value);
+            _stateMgr->getState().setTemperature(temperature._value);
         }
 
         auto humidity = _mswSensor->getHumidity();
         if (humidity._success) {
-            _stateMgr->setHumidity(humidity._value);
+            _stateMgr->getState().setHumidity(humidity._value);
         }
 
         _lastClimateUpdateTime = millis();
@@ -83,7 +84,7 @@ void ComplexSensor::loop()
         auto airQualityRaw = _mswSensor->getAirQuality();
         if (airQualityRaw._success) {
             int16_t airQualiy = _airQualityFilter->filtered(airQualityRaw._value);
-            _stateMgr->setAirQuality(airQualiy);
+            _stateMgr->getState().setAirQuality(airQualiy);
         }
 
         _lastAirQualityUpdateTime = millis();
@@ -92,7 +93,7 @@ void ComplexSensor::loop()
     if ((_lastCO2UpdateTime + 1000) < millis()) {
         auto co2Value = _mswSensor->getCO2Value();
         if (co2Value._success) {
-            _stateMgr->setCO2(co2Value._value);
+            _stateMgr->getState().setCO2(co2Value._value);
         }
 
         _lastCO2UpdateTime = millis();
@@ -101,7 +102,7 @@ void ComplexSensor::loop()
     if ((_lastLightLevelUpdateTime + 10000) < millis()) {
         auto level = _mswSensor->getLightLevel();
         if (level._success) {
-            _stateMgr->setLightLevel(level._value);
+            _stateMgr->getState().setLightLevel(level._value);
         }
 
         _lastLightLevelUpdateTime = millis();

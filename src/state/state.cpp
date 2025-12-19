@@ -18,53 +18,72 @@ bool State::operator==(State& other)
         && (*this)._warmFloorCurrentTemperature == other._warmFloorCurrentTemperature
         && (*this)._warmFloorMode == other._warmFloorMode
         && (*this)._warmFloorSetPoint == other._warmFloorSetPoint
-        && (*this)._warmFloorState == other._warmFloorState;
+        && (*this)._warmFloorState == other._warmFloorState
+        && (*this)._isHumanDetected1 == other._isHumanDetected1;
 }
 
 std::string State::marshalJSON()
 {
     std::string payload = EDUtils::buildJson([this](JsonObject entity) {
-        if (_temperature != -1000.0f) {
-            entity[F("temperature")] = _temperature;
+        if (_temperature.Valid()) {
+            entity[F("temperature")] = _temperature.Value();
         }
 
-        if (_humidity != -1000.0f) {
-            entity[F("humidity")] = _humidity;
+        if (_humidity.Valid()) {
+            entity[F("humidity")] = _humidity.Value();
         }
 
-        if (_airQuality != -1) {
-            entity[F("airQuality")] = _airQuality;
+        if (_airQuality.Valid()) {
+            entity[F("airQuality")] = _airQuality.Value();
         }
 
-        if (_co2Value != -1) {
-            entity[F("co2")] = _co2Value;
+        if (_co2Value.Valid()) {
+            entity[F("co2")] = _co2Value.Value();
         }
 
-        if (_lightLevel != -1.0f) {
-            entity[F("lightLevel")] = _lightLevel;
+        if (_lightLevel.Valid()) {
+            entity[F("lightLevel")] = _lightLevel.Value();
         }
 
-        entity[F("lightNightMode")] = _isLightNightMode ? "true" : "false";
-        entity[F("lightSwitchState")] = _lightSwitchState ? "ON" : "OFF";
-        entity[F("lightBrightness")] = _lightBrightness;
-        entity[F("lightColor")] = EDUtils::formatString("%d,%d,%d", _lightColor.r, _lightColor.g, _lightColor.b);
-        entity[F("lightColorTemp")] = _lightTempColor;
-
-        if (_warmFloorCurrentTemperature != -1000.0f) {
-            entity[F("warmFloorCurrentTemperature")] = _warmFloorCurrentTemperature;
+        if (_isLightNightMode.Valid()) {
+            entity[F("lightNightMode")] = _isLightNightMode.Value() ? "true" : "false";
         }
 
-        if (_warmFloorMode.length() > 0) {
-            entity[F("warmFloorMode")] = _warmFloorMode;
+        if (_lightSwitchState.Valid()) {
+            entity[F("lightSwitchState")] = _lightSwitchState.Value() ? "ON" : "OFF";
         }
 
-        if (_warmFloorSetPoint != -1000.0f) {
-            entity[F("warmFloorSetPoint")] = _warmFloorSetPoint;
+        if (_lightBrightness.Valid()) {
+            entity[F("lightBrightness")] = _lightBrightness.Value();
         }
 
-        entity[F("warmFloorState")] = _warmFloorState ? "heating" : "idle";
+        if (_lightColor.Valid()) {
+            entity[F("lightColor")] = EDUtils::formatString("%d,%d,%d", _lightColor.Value().r, _lightColor.Value().g, _lightColor.Value().b);
+        }
 
-        entity[F("humanDetected1")] = _isHumanDetected1 ? "true" : "false";
+        if (_lightTempColor.Valid()) {
+            entity[F("lightColorTemp")] = _lightTempColor.Value();
+        }
+
+        if (_warmFloorCurrentTemperature.Valid()) {
+            entity[F("warmFloorCurrentTemperature")] = _warmFloorCurrentTemperature.Value();
+        }
+
+        if (_warmFloorMode.Valid()) {
+            entity[F("warmFloorMode")] = _warmFloorMode.Value();
+        }
+
+        if (_warmFloorSetPoint.Valid()) {
+            entity[F("warmFloorSetPoint")] = _warmFloorSetPoint.Value();
+        }
+
+        if (_warmFloorState.Valid()) {
+            entity[F("warmFloorState")] = _warmFloorState.Value() ? "heating" : "idle";
+        }
+
+        if (_isHumanDetected1.Valid()) {
+            entity[F("humanDetected1")] = _isHumanDetected1.Value() ? "true" : "false";
+        }
     });
 
     return payload;

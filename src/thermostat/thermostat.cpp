@@ -1,5 +1,6 @@
 #include <enum/modes.h>
 #include <enum/device_class.h>
+#include <Utils.h>
 
 #include "thermostat.h"
 
@@ -12,18 +13,18 @@ void Thermostat::init(EDHA::Device* device, std::string stateTopic, std::string 
     if (_state.setPoint < MIN_TEMPERATURE || MIN_TEMPERATURE > MAX_TEMPERATURE) {
         _state.setPoint = 20.0f;
     }
-    _stateMgr->setWarmFloorSetPoint(_state.setPoint);
+    _stateMgr->getState().setWarmFloorSetPoint(_state.setPoint);
 
     switch (_state.mode) {
     case THERMOSTAT_MODE_OFF:
-        _stateMgr->setWarmFloorMode(EDHA::mapMode(EDHA::MODE_OFF));
+        _stateMgr->getState().setWarmFloorMode(EDHA::mapMode(EDHA::MODE_OFF));
         break;
     case THERMOSTAT_MODE_HEAT:
-        _stateMgr->setWarmFloorMode(EDHA::mapMode(EDHA::MODE_HEAT));
+        _stateMgr->getState().setWarmFloorMode(EDHA::mapMode(EDHA::MODE_HEAT));
         break;
     }
 
-    _stateMgr->setWarmFloorState(_state.isActive);
+    _stateMgr->getState().setWarmFloorState(_state.isActive);
 
     _relayPin = relayPin;
     pinMode(_relayPin, OUTPUT);
@@ -77,7 +78,7 @@ void Thermostat::changeMode(EDHA::Mode mode)
         return;
     }
 
-    _stateMgr->setWarmFloorMode(EDHA::mapMode(mode));
+    _stateMgr->getState().setWarmFloorMode(EDHA::mapMode(mode));
     _configMgr->getConfig().thermostatState = _state;
     _configMgr->store();
 }
@@ -93,7 +94,7 @@ void Thermostat::changeSetPoint(float_t setPoint)
     }
 
     _state.setPoint = setPoint;
-    _stateMgr->setWarmFloorSetPoint(setPoint);
+    _stateMgr->getState().setWarmFloorSetPoint(setPoint);
     _configMgr->getConfig().thermostatState = _state;
     _configMgr->store();
 }
@@ -133,7 +134,7 @@ void Thermostat::loop()
                 }
             }
 
-            _stateMgr->setWarmFloorCurrentTemperature(temperature._value);
+            _stateMgr->getState().setWarmFloorCurrentTemperature(temperature._value);
             _currentTemperature = temperature._value;
         } else {
             _temperatureSensorFaultCount++;
@@ -152,7 +153,7 @@ void Thermostat::loop()
         }
 
         if (isActiveChange) {
-            _stateMgr->setWarmFloorState(_state.isActive);
+            _stateMgr->getState().setWarmFloorState(_state.isActive);
             _configMgr->getConfig().thermostatState = _state;
             _configMgr->store();
         }

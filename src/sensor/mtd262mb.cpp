@@ -1,3 +1,5 @@
+#include <Utils.h>
+
 #include "mtd262mb.h"
 
 void MTD262MB::init(EDHA::Device* device, std::string stateTopic, uint8_t id, uint8_t address)
@@ -27,7 +29,11 @@ void MTD262MB::loop()
             _isFault = false;
             _faultCount = 0;
 
-            _stateMgr->updateHumanDetected(_id, isHumanDetected == 1);
+            switch (_id) {
+                case 1:
+                    _stateMgr->getState().updateHumanDetected1(isHumanDetected == 1);
+                    break;
+            }
         } else {
             _faultCount++;
 

@@ -6,7 +6,7 @@
 #include <discovery.h>
 #include <mqtt.h>
 #include <healthcheck.h>
-
+#include <state/state_mgr.h>
 #include <wirenboard.h>
 #include <device/wb_msw.h>
 #include <device/wb_led.h>
@@ -24,6 +24,8 @@
 #include "sensor/complex.h"
 #include "sensor/mtd262mb.h"
 #include "sensor/one_wire.h"
+#include "state/state.h"
+#include "state/producer.h"
 #include "thermostat/thermostat.h"
 #include "web/handler.h"
 
@@ -35,7 +37,7 @@ EDWB::WirenBoard modbus(Serial2);
 EDHealthCheck::HealthCheck healthCheck;
 EDHA::DiscoveryMgr discoveryMgr;
 StateProducer stateProducer(&mqtt);
-StateMgr stateMgr(&stateProducer);
+EDUtils::StateMgr<State> stateMgr(&stateProducer);
 
 MainLight mainLight(&modbus);
 Backlight backlight(&modbus);
@@ -51,7 +53,7 @@ LightAutomation lightAutomation(&configMgr, &discoveryMgr, &backlight, &mainLigh
 SwitchCommandConsumer lightSwitchConsumer(&lightAutomation);
 CommandConsumer commandConsumer(&lightAutomation, &warmFloor);
 
-Handler handler(&configMgr, &networkMgr, &stateMgr, &healthCheck, &modbus);
+Handler handler(&configMgr, &networkMgr, &healthCheck, &modbus);
 
 void setup()
 {
