@@ -26,7 +26,7 @@ public:
 
     void changeState(bool enabled);
     void setColor(CRGB color);
-    void setBrightness(uint8_t brightness);
+    void setBrightness(uint8_t brightness, bool updateLight = true);
     void setColorTemperature(uint16_t temperature);
     void changeNightModeState(bool enabled);
     bool isEnabled() const { return _state.enabled; }
@@ -34,13 +34,14 @@ public:
     void loop();
 
 private:
-    void changeStateInternal(bool enabled, bool manual);
+    void changeStateInternal(bool enabled, bool manual, bool updateLight = true);
     void update();
 
 private:
     uint64_t _lastCheckTime = 0;
     uint64_t _lastManualControlTime = 0;
     uint64_t _lastStateUpdateTime = 0;
+    uint64_t _lastChangeNightModeTime = 0;
 
     LightState _state;
     bool _manual = false;

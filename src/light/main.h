@@ -2,6 +2,7 @@
 
 #include <wirenboard.h>
 #include <device/wb_led.h>
+#include <nullable.h>
 #include "light.h"
 
 class MainLight : public Light
@@ -12,13 +13,15 @@ public:
     void init(uint8_t address);
 
     void setEnabled(bool enabled);
-    EDWB::Result<bool> isEnabled() const;
+    EDUtils::Nullable<bool> isEnabled() const;
 
     void setBrightness(uint8_t brightness);
-    EDWB::Result<uint8_t> getBrightness() const;
+    EDUtils::Nullable<uint8_t> getBrightness() const;
 
     void setColorTemperature(uint32_t colorTemp);
-    EDWB::Result<uint32_t> getColorTemperature() const;
+    EDUtils::Nullable<uint32_t> getColorTemperature() const;
+
+    void switchBrightnessControl(bool enabled);
 
 private:
     EDWB::WirenBoard* _modbus = NULL;

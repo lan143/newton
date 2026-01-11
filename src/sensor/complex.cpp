@@ -68,12 +68,24 @@ void ComplexSensor::loop()
 {
     if ((_lastClimateUpdateTime + 10000) < millis()) {
         auto temperature = _mswSensor->getTemperature();
-        if (temperature._success) {
+        if (
+            temperature._success
+            && (
+                !_stateMgr->getState().getTemperature().Valid()
+                || (_stateMgr->getState().getTemperature().Valid() && abs(_stateMgr->getState().getTemperature().Value() - temperature._value) > 0.05f)
+            )
+        ) {
             _stateMgr->getState().setTemperature(temperature._value);
         }
 
         auto humidity = _mswSensor->getHumidity();
-        if (humidity._success) {
+        if (
+            humidity._success
+            && (
+                !_stateMgr->getState().getHumidity().Valid()
+                || (_stateMgr->getState().getHumidity().Valid() && abs(_stateMgr->getState().getHumidity().Value() - humidity._value) > 0.1f)
+            )
+        ) {
             _stateMgr->getState().setHumidity(humidity._value);
         }
 

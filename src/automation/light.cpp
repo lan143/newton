@@ -66,10 +66,15 @@ void LightAutomation::setColor(CRGB color)
     update();
 }
 
-void LightAutomation::setBrightness(uint8_t brightness)
+void LightAutomation::setBrightness(uint8_t brightness, bool updateLight)
 {
     _state.brightness = brightness;
-    update();
+
+    if (updateLight) {
+        update();
+    } else {
+        _stateMgr->getState().setLightBrightness(_state.brightness);
+    }
 }
 
 void LightAutomation::setColorTemperature(uint16_t temperature)
@@ -81,11 +86,14 @@ void LightAutomation::setColorTemperature(uint16_t temperature)
 void LightAutomation::changeNightModeState(bool enabled)
 {
     _state.nightMode = enabled;
+    _lastChangeNightModeTime = millis();
+    _main->switchBrightnessControl(!enabled);
+
     update();
     _stateMgr->getState().setLightNightModeState(enabled);
 }
 
-void LightAutomation::changeStateInternal(bool enabled, bool manual)
+void LightAutomation::changeStateInternal(bool enabled, bool manual, bool updateLight)
 {
     if (_state.enabled == enabled) {
         return;
@@ -98,7 +106,11 @@ void LightAutomation::changeStateInternal(bool enabled, bool manual)
         _lastManualControlTime = millis();
     }
 
-    update();
+    if (updateLight) {
+        update();
+    } else {
+        _stateMgr->getState().setLightSwitchState(_state.enabled);
+    }
 }
 
 void LightAutomation::loop()
@@ -107,12 +119,12 @@ void LightAutomation::loop()
         auto isEnabled = _main->isEnabled();
         auto brightness = _main->getBrightness();
 
-        if (isEnabled._success && _state.enabled != isEnabled._value) {
-            changeStateInternal(isEnabled._value, true);
+        if (isEnabled.Valid() && _state.enabled != isEnabled.Value()) {
+            changeStateInternal(isEnabled.Value(), true, false);
         }
 
-        if (brightness._success && _state.brightness != brightness._value && !_state.nightMode) { // skip change brightness in night mode
-            setBrightness(brightness._value);
+        if (!_state.nightMode && (millis() - _lastChangeNightModeTime) > 2000 && brightness.Valid() && _state.brightness != brightness.Value()) {
+            setBrightness(brightness.Value(), false);
         }
 
         // enable light if human detected, manual mode isnt active and light level < 200 lx
@@ -135,12 +147,7 @@ void LightAutomation::loop()
     }
 
     if ((_lastStateUpdateTime + 60000) < millis()) {
-        if (_configMgr->getConfig().lightState.enabled != _state.enabled
-            || _configMgr->getConfig().lightState.nightMode != _state.nightMode
-            || _configMgr->getConfig().lightState.brightness != _state.brightness
-            || _configMgr->getConfig().lightState.color != _state.color
-            || _configMgr->getConfig().lightState.temperature != _state.temperature
-        ) {
+        if (_configMgr->getConfig().lightState != _state) {
             _configMgr->getConfig().lightState = _state;
             _configMgr->store();
         }
@@ -151,27 +158,25 @@ void LightAutomation::loop()
 
 void LightAutomation::update()
 {
+    if (_state.nightMode) {
+        _backlight->setColor(0xff0000);
+        _backlight->setBrightness(10); // 10% of max
+
+        // temporary while backlight isnt installed
+        _main->setColorTemperature(2700);
+        _main->setBrightness(2); // 2% of max
+    } else {
+        _main->setColorTemperature(_state.temperature);
+        _main->setBrightness(_state.brightness);
+
+        _backlight->setColor(_state.color);
+        _backlight->setBrightness(_state.brightness);
+    }
+
     // temporary commented while backlight isnt installed
     //_main->setEnabled(!_state.nightMode ? _state.enabled : false);
     _main->setEnabled(_state.enabled);
     _backlight->setEnabled(_state.enabled);
-
-    if (_state.enabled) {
-        if (_state.nightMode) {
-            _backlight->setColor(0xff0000);
-            _backlight->setBrightness(10); // 10% of max
-
-            // temporary while backlight isnt installed
-            _main->setColorTemperature(2700);
-            _main->setBrightness(5); // 5% of max
-        } else {
-            _main->setColorTemperature(_state.temperature);
-            _main->setBrightness(_state.brightness);
-
-            _backlight->setColor(_state.color);
-            _backlight->setBrightness(_state.brightness);
-        }
-    }
 
     _stateMgr->getState().setLightSwitchState(_state.enabled);
     _stateMgr->getState().setLightBrightness(_state.brightness);
