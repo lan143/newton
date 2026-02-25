@@ -47,7 +47,7 @@ void LightAutomation::init(EDHA::Device* device, std::string stateTopic, std::st
         ->setMinKelvin(2700)
         ->setMaxKelvin(6000);
 
-    _state = _configMgr->getConfig().lightState;
+    _state = _configMgr->getConfig()->lightState;
     if (_state.enabled) {
         _manual = true;
     }
@@ -86,7 +86,7 @@ void LightAutomation::setColorTemperature(uint16_t temperature)
 void LightAutomation::changeNightModeState(bool enabled)
 {
     _state.nightMode = enabled;
-    _lastChangeNightModeTime = millis();
+    _lastChangeNightModeTime = esp_timer_get_time();
     _main->switchBrightnessControl(!enabled);
 
     update();
@@ -103,7 +103,7 @@ void LightAutomation::changeStateInternal(bool enabled, bool manual, bool update
     _manual = manual;
 
     if (_manual) {
-        _lastManualControlTime = millis();
+        _lastManualControlTime = esp_timer_get_time();
     }
 
     if (updateLight) {
@@ -115,7 +115,7 @@ void LightAutomation::changeStateInternal(bool enabled, bool manual, bool update
 
 void LightAutomation::loop()
 {
-    if ((_lastCheckTime + 500) < millis()) {
+    if ((_lastCheckTime + 500000) < esp_timer_get_time()) {
         auto isEnabled = _main->isEnabled();
         auto brightness = _main->getBrightness();
 
@@ -123,7 +123,7 @@ void LightAutomation::loop()
             changeStateInternal(isEnabled.Value(), true, false);
         }
 
-        if (!_state.nightMode && (millis() - _lastChangeNightModeTime) > 2000 && brightness.Valid() && _state.brightness != brightness.Value()) {
+        if (!_state.nightMode && (esp_timer_get_time() - _lastChangeNightModeTime) > 2000000 && brightness.Valid() && _state.brightness != brightness.Value()) {
             setBrightness(brightness.Value(), false);
         }
 
@@ -138,21 +138,21 @@ void LightAutomation::loop()
             }
         }
 
-        _lastCheckTime = millis();
+        _lastCheckTime = esp_timer_get_time();
     }
 
     // disable manual mode after 1 hour last manual action
-    if (_manual && (_lastManualControlTime + 3600000) < millis()) {
+    if (_manual && (_lastManualControlTime + 3600000000) < esp_timer_get_time()) {
         _manual = false;
     }
 
-    if ((_lastStateUpdateTime + 60000) < millis()) {
-        if (_configMgr->getConfig().lightState != _state) {
-            _configMgr->getConfig().lightState = _state;
+    if ((_lastStateUpdateTime + 60000000) < esp_timer_get_time()) {
+        if (_configMgr->getConfig()->lightState != _state) {
+            _configMgr->getConfig()->lightState = _state;
             _configMgr->store();
         }
 
-        _lastStateUpdateTime = millis();
+        _lastStateUpdateTime = esp_timer_get_time();
     }
 }
 

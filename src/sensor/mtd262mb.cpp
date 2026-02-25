@@ -23,7 +23,7 @@ void MTD262MB::init(EDHA::Device* device, std::string stateTopic, uint8_t id, ui
 
 void MTD262MB::loop()
 {
-    if ((_lastUpdateTime + 1000) < millis()) {
+    if ((_lastUpdateTime + 1000000) < esp_timer_get_time()) {
         auto isHumanDetected = _client->inputRegisterRead(_address, 0x0);
         if (isHumanDetected != -1) {
             _isFault = false;
@@ -42,6 +42,6 @@ void MTD262MB::loop()
             }
         }
 
-        _lastUpdateTime = millis();
+        _lastUpdateTime = esp_timer_get_time();
     }
 }

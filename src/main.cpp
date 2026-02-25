@@ -10,6 +10,7 @@
 #include <wirenboard.h>
 #include <device/wb_msw.h>
 #include <device/wb_led.h>
+#include <network/network.h>
 
 #include "defines.h"
 #include "config.h"
@@ -18,7 +19,6 @@
 #include "command/switch_command_consumer.h"
 #include "light/backlight.h"
 #include "light/main.h"
-#include "network/network.h"
 #include "state/producer.h"
 #include "state/state_mgr.h"
 #include "sensor/complex.h"
@@ -30,8 +30,8 @@
 #include "web/handler.h"
 
 EDConfig::ConfigMgr<Config> configMgr(EEPROM_SIZE);
-NetworkMgr networkMgr(configMgr.getConfig(), true);
-EDMQTT::MQTT mqtt(configMgr.getConfig().mqtt);
+EDNetwork::NetworkMgr networkMgr;
+EDMQTT::MQTT mqtt;
 EDWB::WirenBoard modbus(Serial2);
 
 EDHealthCheck::HealthCheck healthCheck;
@@ -66,32 +66,32 @@ void setup()
 
     SPIFFS.begin(true);
 
-    configMgr.setDefault([](Config& config) {
-        snprintf(config.wifiAPSSID, WIFI_SSID_LEN, "Newton_%s", EDUtils::getMacAddress().c_str());
-        snprintf(config.mqttStateTopic, MQTT_TOPIC_LEN, "newton/%s/state", EDUtils::getChipID());
-        snprintf(config.mqttCommandTopic, MQTT_TOPIC_LEN, "newton/%s/set", EDUtils::getChipID());
-        snprintf(config.mqttLightSwitchCommandTopic, MQTT_TOPIC_LEN, "newton/%s/light/switch", EDUtils::getChipID());
-        snprintf(config.mqttHADiscoveryPrefix, MQTT_TOPIC_LEN, "homeassistant");
-        config.modbusSpeed = 9600;
-        config.addressWBMSW = 1;
-        config.addressWBLED1 = 3;
-        config.addressWBLED2 = 4;
-        config.addressWBM1W2 = 5;
-        config.addressMTD262MB = 6;
+    configMgr.setDefault([](Config* config) {
+        snprintf(config->wifiAPSSID, WIFI_SSID_LEN, "Newton_%s", EDUtils::getMacAddress().c_str());
+        snprintf(config->mqttStateTopic, MQTT_TOPIC_LEN, "newton/%s/state", EDUtils::getChipID());
+        snprintf(config->mqttCommandTopic, MQTT_TOPIC_LEN, "newton/%s/set", EDUtils::getChipID());
+        snprintf(config->mqttLightSwitchCommandTopic, MQTT_TOPIC_LEN, "newton/%s/light/switch", EDUtils::getChipID());
+        snprintf(config->mqttHADiscoveryPrefix, MQTT_TOPIC_LEN, "homeassistant");
+        config->modbusSpeed = 9600;
+        config->addressWBMSW = 1;
+        config->addressWBLED1 = 3;
+        config->addressWBLED2 = 4;
+        config->addressWBM1W2 = 5;
+        config->addressMTD262MB = 6;
     });
     configMgr.load();
 
-    Serial2.begin(configMgr.getConfig().modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
+    Serial2.begin(configMgr.getConfig()->modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
     modbus.init(15);
 
-    networkMgr.init();
+    networkMgr.init(configMgr.getConfig()->asNetworkConfig(), true, ETH_ADDR, -1, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
 
     ArduinoOTA.setPassword("somestrongpassword");
     ArduinoOTA.begin();
 
-    commandConsumer.init(configMgr.getConfig().mqttCommandTopic);
+    commandConsumer.init(configMgr.getConfig()->mqttCommandTopic);
 
-    mqtt.init();
+    mqtt.init(configMgr.getConfig()->mqtt);
     networkMgr.OnConnect([&](bool isConnected) {
         if (isConnected) {
             mqtt.connect();
@@ -102,13 +102,13 @@ void setup()
     healthCheck.registerService(&mqtt);
     mqtt.subscribe(&commandConsumer);
 
-    stateProducer.init(configMgr.getConfig().mqttStateTopic);
+    stateProducer.init(configMgr.getConfig()->mqttStateTopic);
 
     handler.init();
 
     discoveryMgr.init(
-        configMgr.getConfig().mqttHADiscoveryPrefix,
-        configMgr.getConfig().mqttIsHADiscovery,
+        configMgr.getConfig()->mqttHADiscoveryPrefix,
+        configMgr.getConfig()->mqttIsHADiscovery,
         [](std::string topicName, std::string payload) {
             return mqtt.publish(topicName.c_str(), payload.c_str(), true);
         }
@@ -121,20 +121,20 @@ void setup()
         ->setName(deviceName)
         ->setManufacturer(deviceManufacturer);
 
-    lightSwitchConsumer.init(configMgr.getConfig().mqttLightSwitchCommandTopic);
+    lightSwitchConsumer.init(configMgr.getConfig()->mqttLightSwitchCommandTopic);
     mqtt.subscribe(&lightSwitchConsumer);
 
-    complexSensor.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().addressWBMSW);
-    mtd262mb.init(device, configMgr.getConfig().mqttStateTopic, 1, configMgr.getConfig().addressMTD262MB);
+    complexSensor.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->addressWBMSW);
+    mtd262mb.init(device, configMgr.getConfig()->mqttStateTopic, 1, configMgr.getConfig()->addressMTD262MB);
     healthCheck.registerService(&mtd262mb);
     oneWireModbus.init(configMgr.getConfig());
 
-    mainLight.init(configMgr.getConfig().addressWBLED1);
-    backlight.init(configMgr.getConfig().addressWBLED2);
+    mainLight.init(configMgr.getConfig()->addressWBLED1);
+    backlight.init(configMgr.getConfig()->addressWBLED2);
 
-    lightAutomation.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().mqttCommandTopic, configMgr.getConfig().mqttLightSwitchCommandTopic);
+    lightAutomation.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->mqttCommandTopic, configMgr.getConfig()->mqttLightSwitchCommandTopic);
 
-    warmFloor.init(device, configMgr.getConfig().mqttStateTopic, configMgr.getConfig().mqttCommandTopic, RELAY_WARM_FLOOR);
+    warmFloor.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->mqttCommandTopic, RELAY_WARM_FLOOR);
     healthCheck.registerService(&warmFloor);
 
     ESP_LOGI("setup", "complete");

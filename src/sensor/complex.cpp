@@ -66,7 +66,7 @@ void ComplexSensor::init(EDHA::Device* device, std::string stateTopic, uint8_t a
 
 void ComplexSensor::loop()
 {
-    if ((_lastClimateUpdateTime + 10000) < millis()) {
+    if ((_lastClimateUpdateTime + 10000000) < esp_timer_get_time()) {
         auto temperature = _mswSensor->getTemperature();
         if (
             temperature._success
@@ -89,34 +89,34 @@ void ComplexSensor::loop()
             _stateMgr->getState().setHumidity(humidity._value);
         }
 
-        _lastClimateUpdateTime = millis();
+        _lastClimateUpdateTime = esp_timer_get_time();
     }
 
-    if ((_lastAirQualityUpdateTime + 1000) < millis()) {
+    if ((_lastAirQualityUpdateTime + 1000000) < esp_timer_get_time()) {
         auto airQualityRaw = _mswSensor->getAirQuality();
         if (airQualityRaw._success) {
             int16_t airQualiy = _airQualityFilter->filtered(airQualityRaw._value);
             _stateMgr->getState().setAirQuality(airQualiy);
         }
 
-        _lastAirQualityUpdateTime = millis();
+        _lastAirQualityUpdateTime = esp_timer_get_time();
     }
 
-    if ((_lastCO2UpdateTime + 1000) < millis()) {
+    if ((_lastCO2UpdateTime + 1000000) < esp_timer_get_time()) {
         auto co2Value = _mswSensor->getCO2Value();
         if (co2Value._success) {
             _stateMgr->getState().setCO2(co2Value._value);
         }
 
-        _lastCO2UpdateTime = millis();
+        _lastCO2UpdateTime = esp_timer_get_time();
     }
 
-    if ((_lastLightLevelUpdateTime + 10000) < millis()) {
+    if ((_lastLightLevelUpdateTime + 10000000) < esp_timer_get_time()) {
         auto level = _mswSensor->getLightLevel();
         if (level._success) {
             _stateMgr->getState().setLightLevel(level._value);
         }
 
-        _lastLightLevelUpdateTime = millis();
+        _lastLightLevelUpdateTime = esp_timer_get_time();
     }
 }

@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <mqtt_config.h>
+#include <network/network_config.h>
 #include "automation/light_state.h"
 #include "thermostat/state.h"
 
@@ -51,4 +52,16 @@ struct Config
     LightState lightState;
 
     ThermostatState thermostatState;
+
+    EDNetwork::Config asNetworkConfig() // tmp
+    {
+        EDNetwork::Config cfg;
+        cfg.isAPMode = isAPMode;
+        strcpy(cfg.wifiAPSSID, wifiAPSSID);
+        cfg.wifiAPHasPassword = wifiAPHasPassword;
+        strcpy(cfg.wifiSSID, wifiSSID);
+        strcpy(cfg.wifiPassword, wifiPassword);
+
+        return cfg;
+    }
 };

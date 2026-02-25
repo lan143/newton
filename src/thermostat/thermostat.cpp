@@ -9,7 +9,7 @@
 
 void Thermostat::init(EDHA::Device* device, std::string stateTopic, std::string commandTopic, uint8_t relayPin)
 {
-    _state = _configMgr->getConfig().thermostatState;
+    _state = _configMgr->getConfig()->thermostatState;
     if (_state.setPoint < MIN_TEMPERATURE || MIN_TEMPERATURE > MAX_TEMPERATURE) {
         _state.setPoint = 20.0f;
     }
@@ -79,7 +79,7 @@ void Thermostat::changeMode(EDHA::Mode mode)
     }
 
     _stateMgr->getState().setWarmFloorMode(EDHA::mapMode(mode));
-    _configMgr->getConfig().thermostatState = _state;
+    _configMgr->getConfig()->thermostatState = _state;
     _configMgr->store();
 }
 
@@ -95,13 +95,13 @@ void Thermostat::changeSetPoint(float_t setPoint)
 
     _state.setPoint = setPoint;
     _stateMgr->getState().setWarmFloorSetPoint(setPoint);
-    _configMgr->getConfig().thermostatState = _state;
+    _configMgr->getConfig()->thermostatState = _state;
     _configMgr->store();
 }
 
 void Thermostat::loop()
 {
-    if ((_loopLastTime + 2000) < millis()) {
+    if ((_loopLastTime + 2000000) < esp_timer_get_time()) {
         auto temperature = _oneWireModbus->getWarmFloorTemperature();
         bool isActiveChange = false;
 
@@ -154,10 +154,10 @@ void Thermostat::loop()
 
         if (isActiveChange) {
             _stateMgr->getState().setWarmFloorState(_state.isActive);
-            _configMgr->getConfig().thermostatState = _state;
+            _configMgr->getConfig()->thermostatState = _state;
             _configMgr->store();
         }
 
-        _loopLastTime = millis();
+        _loopLastTime = esp_timer_get_time();
     }
 }
