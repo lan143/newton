@@ -11,6 +11,7 @@
 #include <device/wb_msw.h>
 #include <device/wb_led.h>
 #include <network/network.h>
+#include <log/log.h>
 
 #include "defines.h"
 #include "config.h"
@@ -61,8 +62,10 @@ void setup()
 
     Serial.begin(SERIAL_SPEED);
 
-    ESP_LOGI("setup", "Newton");
-    ESP_LOGI("setup", "start");
+    esp_log_level_set("*", ESP_LOG_VERBOSE);
+
+    LOGI("setup", "Newton");
+    LOGI("setup", "start");
 
     SPIFFS.begin(true);
 
@@ -81,10 +84,18 @@ void setup()
     });
     configMgr.load();
 
+    // tmp
+    EDUtils::LogConfig networkConfig;
+    strcpy(networkConfig.host, "192.168.1.2");
+    networkConfig.port = 5555;
+    strcpy(networkConfig.uri, "/_bulk");
+
+    networkLogger.init(networkConfig, CONTROLLER_NAME, EDUtils::formatString("Newton_%s", EDUtils::getMacAddress().c_str()));
+
     Serial2.begin(configMgr.getConfig()->modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
     modbus.init(15);
 
-    networkMgr.init(configMgr.getConfig()->asNetworkConfig(), true, ETH_ADDR, -1, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
+    networkMgr.init(configMgr.getConfig()->asNetworkConfig(), false, ETH_ADDR, -1, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
 
     ArduinoOTA.setPassword("somestrongpassword");
     ArduinoOTA.begin();
@@ -93,6 +104,9 @@ void setup()
 
     mqtt.init(configMgr.getConfig()->mqtt);
     networkMgr.OnConnect([&](bool isConnected) {
+        networkLogger.enable(isConnected);
+        LOGD("network", "network event. connected: %s", isConnected ? "true" : "false");
+
         if (isConnected) {
             mqtt.connect();
         } else {
@@ -137,7 +151,7 @@ void setup()
     warmFloor.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->mqttCommandTopic, RELAY_WARM_FLOOR);
     healthCheck.registerService(&warmFloor);
 
-    ESP_LOGI("setup", "complete");
+    LOGI("setup", "complete");
 }
 
 void loop()
@@ -151,4 +165,5 @@ void loop()
     lightAutomation.loop();
     warmFloor.loop();
     mtd262mb.loop();
+    networkLogger.update();
 }

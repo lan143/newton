@@ -1,4 +1,5 @@
 #include <Utils.h>
+#include <log/log.h>
 
 #include "light.h"
 
@@ -93,7 +94,7 @@ void LightAutomation::changeNightModeState(bool enabled)
     _stateMgr->getState().setLightNightModeState(enabled);
 }
 
-void LightAutomation::changeStateInternal(bool enabled, bool manual, bool updateLight)
+void LightAutomation::changeStateInternal(bool enabled, bool manual)
 {
     if (_state.enabled == enabled) {
         return;
@@ -106,11 +107,7 @@ void LightAutomation::changeStateInternal(bool enabled, bool manual, bool update
         _lastManualControlTime = esp_timer_get_time();
     }
 
-    if (updateLight) {
-        update();
-    } else {
-        _stateMgr->getState().setLightSwitchState(_state.enabled);
-    }
+    update();
 }
 
 void LightAutomation::loop()
@@ -120,29 +117,46 @@ void LightAutomation::loop()
         auto brightness = _main->getBrightness();
 
         if (isEnabled.Valid() && _state.enabled != isEnabled.Value()) {
-            changeStateInternal(isEnabled.Value(), true, false);
+            LOGD("automation", "change light state from WB-LED. enabled: %s", isEnabled.Value() ? "true" : "false");
+            changeStateInternal(isEnabled.Value(), true);
         }
 
-        if (!_state.nightMode && (esp_timer_get_time() - _lastChangeNightModeTime) > 2000000 && brightness.Valid() && _state.brightness != brightness.Value()) {
+        if (
+            !_state.nightMode
+            && brightness.Valid() && _state.brightness != brightness.Value()
+        ) {
+            LOGD("automation", "change brightness from WB-LED. brightness: %d", brightness.Value());
             setBrightness(brightness.Value(), false);
         }
 
+        auto isHumanDetected = _stateMgr->getState().isHumanDetected1();
+        if (isHumanDetected.Valid() && isHumanDetected.Value()) {
+            _lastHumanDetectTime = esp_timer_get_time();
+        }
+
         // enable light if human detected, manual mode isnt active and light level < 200 lx
-        if (_stateMgr->getState().isHumanDetected1().Valid() && _stateMgr->getState().getLightLevel().Valid()) {
-            if (_stateMgr->getState().isHumanDetected1().Value() && !_manual) {
-                if (_stateMgr->getState().getLightLevel().Value() < 200.0f) {
+        if (!_manual) {
+            auto lightLevel = _stateMgr->getState().getLightLevel();
+
+            if (isHumanDetected.Valid() && lightLevel.Valid()) {
+                if (isHumanDetected.Value() && lightLevel.Value() < 150.0f) {
                     changeStateInternal(true, false);
+                } else if (!isHumanDetected.Value()) {
+                    changeStateInternal(false, false);
                 }
-            } else {
-                changeStateInternal(false, false);
             }
         }
 
         _lastCheckTime = esp_timer_get_time();
     }
 
-    // disable manual mode after 1 hour last manual action
-    if (_manual && (_lastManualControlTime + 3600000000) < esp_timer_get_time()) {
+    if (
+        _manual
+        && (
+            (_state.enabled && (_lastManualControlTime + 300000000) < esp_timer_get_time()) // manual mode turns off after 5 minutes if the light was turned on manually
+            || (!_state.enabled && (_lastHumanDetectTime + 600000000) < esp_timer_get_time()) // manual mode turns off 10 minutes after a person leaves the room and light is disabled
+        )
+    ) {
         _manual = false;
     }
 

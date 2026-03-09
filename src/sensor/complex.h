@@ -16,7 +16,7 @@ public:
         EDUtils::StateMgr<State>* stateMgr,
         EDWB::WirenBoard* modbus
     ) : _discoveryMgr(discoveryMgr), _stateMgr(stateMgr), _modbus(modbus) {
-        _airQualityFilter = new GKalman(50, 0.7f);
+        _airQualityFilter = new GKalman(65, 10.0f);
     }
 
     void init(EDHA::Device* device, std::string stateTopic, uint8_t address);

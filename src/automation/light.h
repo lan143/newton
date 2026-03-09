@@ -34,11 +34,12 @@ public:
     void loop();
 
 private:
-    void changeStateInternal(bool enabled, bool manual, bool updateLight = true);
+    void changeStateInternal(bool enabled, bool manual);
     void update();
 
 private:
     uint64_t _lastCheckTime = 0;
+    uint64_t _lastHumanDetectTime = 0;
     uint64_t _lastManualControlTime = 0;
     uint64_t _lastStateUpdateTime = 0;
     uint64_t _lastChangeNightModeTime = 0;

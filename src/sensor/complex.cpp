@@ -36,7 +36,6 @@ void ComplexSensor::init(EDHA::Device* device, std::string stateTopic, uint8_t a
     )
         ->setStateTopic(stateTopic)
         ->setValueTemplate("{{ value_json.airQuality }}")
-        ->setUnitOfMeasurement("ppb")
         ->setDeviceClass(EDHA::deviceClassSensorAQI);
 
     _discoveryMgr->addSensor(
@@ -92,7 +91,7 @@ void ComplexSensor::loop()
         _lastClimateUpdateTime = esp_timer_get_time();
     }
 
-    if ((_lastAirQualityUpdateTime + 1000000) < esp_timer_get_time()) {
+    if ((_lastAirQualityUpdateTime + 10000000) < esp_timer_get_time()) {
         auto airQualityRaw = _mswSensor->getAirQuality();
         if (airQualityRaw._success) {
             int16_t airQualiy = _airQualityFilter->filtered(airQualityRaw._value);
@@ -102,7 +101,7 @@ void ComplexSensor::loop()
         _lastAirQualityUpdateTime = esp_timer_get_time();
     }
 
-    if ((_lastCO2UpdateTime + 1000000) < esp_timer_get_time()) {
+    if ((_lastCO2UpdateTime + 10000000) < esp_timer_get_time()) {
         auto co2Value = _mswSensor->getCO2Value();
         if (co2Value._success) {
             _stateMgr->getState().setCO2(co2Value._value);
