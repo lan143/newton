@@ -58,7 +58,7 @@ void LightAutomation::init(EDHA::Device* device, std::string stateTopic, std::st
 
 void LightAutomation::changeState(bool enabled)
 {
-    changeStateInternal(enabled, enabled ? false : true); // we enable manual mode only when light disabled by switch or mqtt
+    changeStateInternal(enabled, true);
 }
 
 void LightAutomation::setColor(CRGB color)
@@ -76,22 +76,26 @@ void LightAutomation::setBrightness(uint8_t brightness, bool updateLight)
     } else {
         _stateMgr->getState().setLightBrightness(_state.brightness);
     }
+
+    saveState();
 }
 
 void LightAutomation::setColorTemperature(uint16_t temperature)
 {
     _state.temperature = temperature;
+
     update();
+    saveState();
 }
 
 void LightAutomation::changeNightModeState(bool enabled)
 {
     _state.nightMode = enabled;
-    _lastChangeNightModeTime = esp_timer_get_time();
     _main->switchBrightnessControl(!enabled);
+    _stateMgr->getState().setLightNightModeState(enabled);
 
     update();
-    _stateMgr->getState().setLightNightModeState(enabled);
+    saveState();
 }
 
 void LightAutomation::changeStateInternal(bool enabled, bool manual)
@@ -105,6 +109,8 @@ void LightAutomation::changeStateInternal(bool enabled, bool manual)
 
     if (_manual) {
         _lastManualControlTime = esp_timer_get_time();
+
+        saveState();
     }
 
     update();
@@ -114,6 +120,7 @@ void LightAutomation::loop()
 {
     if ((_lastCheckTime + 500000) < esp_timer_get_time()) {
         auto isEnabled = _main->isEnabled();
+        _backlight->setEnabled(true);
         auto brightness = _main->getBrightness();
 
         if (isEnabled.Valid() && _state.enabled != isEnabled.Value()) {
@@ -134,12 +141,17 @@ void LightAutomation::loop()
             _lastHumanDetectTime = esp_timer_get_time();
         }
 
-        // enable light if human detected, manual mode isnt active and light level < 200 lx
-        if (!_manual) {
-            auto lightLevel = _stateMgr->getState().getLightLevel();
+        auto lightLevel = _stateMgr->getState().getLightLevel();
+        if (lightLevel.Valid() && lightLevel.Value() < 150.0f) {
+            lightLowLevelCount++;
+        } else {
+            lightLowLevelCount = 0;
+        }
 
-            if (isHumanDetected.Valid() && lightLevel.Valid()) {
-                if (isHumanDetected.Value() && lightLevel.Value() < 150.0f) {
+        // enable light if human detected, manual mode isnt active and light level is low
+        if (!_manual) {
+            if (isHumanDetected.Valid()) {
+                if (isHumanDetected.Value() && lightLowLevelCount > 120) {
                     changeStateInternal(true, false);
                 } else if (!isHumanDetected.Value()) {
                     changeStateInternal(false, false);
@@ -160,13 +172,14 @@ void LightAutomation::loop()
         _manual = false;
     }
 
-    if ((_lastStateUpdateTime + 60000000) < esp_timer_get_time()) {
-        if (_configMgr->getConfig()->lightState != _state) {
-            _configMgr->getConfig()->lightState = _state;
-            _configMgr->store();
+    if (_needStoreState && (_lastUpdateStateTime + 10000000) < esp_timer_get_time()) {
+        if (_configMgr->store()) {
+            _needStoreState = false;
+        } else {
+            LOGE("loop", "failed to store state");
         }
 
-        _lastStateUpdateTime = esp_timer_get_time();
+        _lastUpdateStateTime = esp_timer_get_time();
     }
 }
 
@@ -196,4 +209,10 @@ void LightAutomation::update()
     _stateMgr->getState().setLightBrightness(_state.brightness);
     _stateMgr->getState().setLightColor(_state.color);
     _stateMgr->getState().setLightTempColor(_state.temperature);
+}
+
+void LightAutomation::saveState()
+{
+    _configMgr->getConfig()->lightState = _state;
+    _needStoreState = true;
 }

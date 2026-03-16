@@ -13,7 +13,11 @@ void MainLight::init(uint8_t address)
 
 void MainLight::setEnabled(bool enabled)
 {
-    _led1->enableCCT1(enabled);
+    auto result = _led1->isEnabledCCT1();
+
+    if (result._success && result._value != enabled) {
+        _led1->enableCCT1(enabled);
+    }
 }
 
 EDUtils::Nullable<bool> MainLight::isEnabled() const
@@ -25,7 +29,11 @@ EDUtils::Nullable<bool> MainLight::isEnabled() const
 
 void MainLight::setBrightness(uint8_t brightness)
 {
-    _led1->setBrightnessCCT1(brightness);
+    auto result = _led1->getBrightnessCCT1();
+
+    if (result._success && result._value != brightness) {
+        _led1->setBrightnessCCT1(brightness);
+    }
 }
 
 EDUtils::Nullable<uint8_t> MainLight::getBrightness() const
@@ -37,7 +45,12 @@ EDUtils::Nullable<uint8_t> MainLight::getBrightness() const
 
 void MainLight::setColorTemperature(uint32_t colorTemp)
 {
-    _led1->setTemperatureCCT1(map(colorTemp, 2700, 6000, 0, 100));
+    auto result = _led1->getTemperatureCCT1();
+    auto val = map(colorTemp, 2700, 6000, 0, 100);
+
+    if (result._success && result._value != val) {
+        _led1->setTemperatureCCT1(val);
+    }
 }
 
 EDUtils::Nullable<uint32_t> MainLight::getColorTemperature() const

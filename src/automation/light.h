@@ -37,15 +37,19 @@ private:
     void changeStateInternal(bool enabled, bool manual);
     void update();
 
+    void saveState();
+
 private:
     uint64_t _lastCheckTime = 0;
     uint64_t _lastHumanDetectTime = 0;
     uint64_t _lastManualControlTime = 0;
-    uint64_t _lastStateUpdateTime = 0;
-    uint64_t _lastChangeNightModeTime = 0;
+
+    uint64_t _lastUpdateStateTime = 0;
+    bool _needStoreState = false;
 
     LightState _state;
     bool _manual = false;
+    uint64_t lightLowLevelCount = 0;
 
 private:
     EDConfig::ConfigMgr<Config>* _configMgr = NULL;
