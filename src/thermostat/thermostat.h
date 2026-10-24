@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ConfigMgr.h>
+#include <data_mgr.h>
 #include <discovery.h>
 #include <state/state_mgr.h>
 #include <ready.h>
@@ -12,7 +12,7 @@ class Thermostat : public EDHealthCheck::Ready
 {
 public:
     Thermostat(
-        EDConfig::ConfigMgr<Config>* configMgr,
+        EDConfig::DataMgr<Config>* configMgr,
         EDHA::DiscoveryMgr* discoveryMgr,
         EDUtils::StateMgr<State>* stateMgr,
         OneWire* oneWireModbus
@@ -41,7 +41,7 @@ private:
     unsigned long _loopLastTime = 0;
 
 private:
-    EDConfig::ConfigMgr<Config>* _configMgr = NULL;
+    EDConfig::DataMgr<Config>* _configMgr = NULL;
     EDHA::DiscoveryMgr* _discoveryMgr = NULL;
     EDUtils::StateMgr<State>* _stateMgr = NULL;
     OneWire* _oneWireModbus = NULL;

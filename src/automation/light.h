@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <ConfigMgr.h>
+#include <data_mgr.h>
 #include <discovery.h>
 #include <state/state_mgr.h>
 
@@ -15,7 +15,7 @@ class LightAutomation
 {
 public:
     LightAutomation(
-        EDConfig::ConfigMgr<Config>* configMgr,
+        EDConfig::DataMgr<Config>* configMgr,
         EDHA::DiscoveryMgr* discoveryMgr,
         Backlight* backlight,
         MainLight* main,
@@ -52,7 +52,7 @@ private:
     uint64_t lightLowLevelCount = 0;
 
 private:
-    EDConfig::ConfigMgr<Config>* _configMgr = NULL;
+    EDConfig::DataMgr<Config>* _configMgr = NULL;
     EDHA::DiscoveryMgr* _discoveryMgr = NULL;
     Backlight* _backlight = NULL;
     MainLight* _main = NULL;

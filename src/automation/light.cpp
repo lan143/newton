@@ -48,7 +48,7 @@ void LightAutomation::init(EDHA::Device* device, std::string stateTopic, std::st
         ->setMinKelvin(2700)
         ->setMaxKelvin(6000);
 
-    _state = _configMgr->getConfig()->lightState;
+    _state = _configMgr->getData()->lightState;
     if (_state.enabled) {
         _manual = true;
     }
@@ -213,6 +213,6 @@ void LightAutomation::update()
 
 void LightAutomation::saveState()
 {
-    _configMgr->getConfig()->lightState = _state;
+    _configMgr->getData()->lightState = _state;
     _needStoreState = true;
 }

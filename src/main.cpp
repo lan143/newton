@@ -1,7 +1,8 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <SPIFFS.h>
-#include <ConfigMgr.h>
+#include <data_mgr.h>
+#include <storage/littlefs_storage.hpp>
 #include <esp_log.h>
 #include <discovery.h>
 #include <mqtt.h>
@@ -30,7 +31,7 @@
 #include "thermostat/thermostat.h"
 #include "web/handler.h"
 
-EDConfig::ConfigMgr<Config> configMgr(EEPROM_SIZE);
+EDConfig::DataMgr<Config> configMgr(new EDConfig::StorageLittleFS<Config>("/config.bin"));
 EDNetwork::NetworkMgr networkMgr;
 EDMQTT::MQTT mqtt;
 EDWB::WirenBoard modbus(Serial2);
@@ -59,6 +60,7 @@ Handler handler(&configMgr, &networkMgr, &healthCheck, &modbus);
 void setup()
 {
     randomSeed(micros());
+    delay(10000);
 
     Serial.begin(SERIAL_SPEED);
 
@@ -67,7 +69,11 @@ void setup()
     LOGI("setup", "Newton");
     LOGI("setup", "start");
 
-    SPIFFS.begin(true);
+    LOGI("setup", "littlefs begin");
+    if (!LittleFS.begin(true)) {
+        LOGE("setup", "failed to init littlefs");
+        return;
+    }
 
     configMgr.setDefault([](Config* config) {
         snprintf(config->wifiAPSSID, WIFI_SSID_LEN, "Newton_%s", EDUtils::getMacAddress().c_str());
@@ -92,17 +98,17 @@ void setup()
 
     networkLogger.init(networkConfig, CONTROLLER_NAME, EDUtils::formatString("Newton_%s", EDUtils::getMacAddress().c_str()));
 
-    Serial2.begin(configMgr.getConfig()->modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
+    Serial2.begin(configMgr.getData()->modbusSpeed, SERIAL_8N1, RS485RX, RS485TX);
     modbus.init(15);
 
-    networkMgr.init(configMgr.getConfig()->asNetworkConfig(), false, ETH_ADDR, -1, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
+    networkMgr.init(configMgr.getData()->asNetworkConfig(), false, ETH_ADDR, -1, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
 
     ArduinoOTA.setPassword("somestrongpassword");
     ArduinoOTA.begin();
 
-    commandConsumer.init(configMgr.getConfig()->mqttCommandTopic);
+    commandConsumer.init(configMgr.getData()->mqttCommandTopic);
 
-    mqtt.init(configMgr.getConfig()->mqtt);
+    mqtt.init(configMgr.getData()->mqtt);
     networkMgr.OnConnect([&](bool isConnected) {
         networkLogger.enable(isConnected);
         LOGD("network", "network event. connected: %s", isConnected ? "true" : "false");
@@ -116,13 +122,13 @@ void setup()
     healthCheck.registerService(&mqtt);
     mqtt.subscribe(&commandConsumer);
 
-    stateProducer.init(configMgr.getConfig()->mqttStateTopic);
+    stateProducer.init(configMgr.getData()->mqttStateTopic);
 
     handler.init();
 
     discoveryMgr.init(
-        configMgr.getConfig()->mqttHADiscoveryPrefix,
-        configMgr.getConfig()->mqttIsHADiscovery,
+        configMgr.getData()->mqttHADiscoveryPrefix,
+        configMgr.getData()->mqttIsHADiscovery,
         [](std::string topicName, std::string payload) {
             return mqtt.publish(topicName.c_str(), payload.c_str(), true);
         }
@@ -135,20 +141,20 @@ void setup()
         ->setName(deviceName)
         ->setManufacturer(deviceManufacturer);
 
-    lightSwitchConsumer.init(configMgr.getConfig()->mqttLightSwitchCommandTopic);
+    lightSwitchConsumer.init(configMgr.getData()->mqttLightSwitchCommandTopic);
     mqtt.subscribe(&lightSwitchConsumer);
 
-    complexSensor.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->addressWBMSW);
-    mtd262mb.init(device, configMgr.getConfig()->mqttStateTopic, 1, configMgr.getConfig()->addressMTD262MB);
+    complexSensor.init(device, configMgr.getData()->mqttStateTopic, configMgr.getData()->addressWBMSW);
+    mtd262mb.init(device, configMgr.getData()->mqttStateTopic, 1, configMgr.getData()->addressMTD262MB);
     healthCheck.registerService(&mtd262mb);
-    oneWireModbus.init(configMgr.getConfig());
+    oneWireModbus.init(configMgr.getData());
 
-    mainLight.init(configMgr.getConfig()->addressWBLED1);
-    backlight.init(configMgr.getConfig()->addressWBLED2);
+    mainLight.init(configMgr.getData()->addressWBLED1);
+    backlight.init(configMgr.getData()->addressWBLED2);
 
-    lightAutomation.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->mqttCommandTopic, configMgr.getConfig()->mqttLightSwitchCommandTopic);
+    lightAutomation.init(device, configMgr.getData()->mqttStateTopic, configMgr.getData()->mqttCommandTopic, configMgr.getData()->mqttLightSwitchCommandTopic);
 
-    warmFloor.init(device, configMgr.getConfig()->mqttStateTopic, configMgr.getConfig()->mqttCommandTopic, RELAY_WARM_FLOOR);
+    warmFloor.init(device, configMgr.getData()->mqttStateTopic, configMgr.getData()->mqttCommandTopic, RELAY_WARM_FLOOR);
     healthCheck.registerService(&warmFloor);
 
     LOGI("setup", "complete");

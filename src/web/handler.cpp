@@ -1,6 +1,6 @@
 #include <ArduinoJSON.h>
 #include <FS.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <esp_system.h>
 #include <ExtStrings.h>
 #include <Json.h>
@@ -11,9 +11,9 @@
 
 void Handler::init()
 {
-    _server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
-    _server->serveStatic("/jquery-3.6.0.min.js", SPIFFS, "/jquery-3.6.0.min.js");
-    _server->serveStatic("/bootstrap.min.js", SPIFFS, "/bootstrap.min.js");
+    _server->serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+    _server->serveStatic("/jquery-3.6.0.min.js", LittleFS, "/jquery-3.6.0.min.js");
+    _server->serveStatic("/bootstrap.min.js", LittleFS, "/bootstrap.min.js");
 
     _healthCheck->registerHandlers(_server);
 
@@ -37,7 +37,7 @@ void Handler::init()
         AsyncResponseStream *response = request->beginResponseStream("application/json");
 
         std::string payload = EDUtils::buildJson([this](JsonObject entity) {
-            auto config = _configMgr->getConfig();
+            auto config = _configMgr->getData();
 
             entity["modbusSpeed"] = config->modbusSpeed;
             entity["addressWBMSW"] = config->addressWBMSW;
@@ -137,7 +137,7 @@ void Handler::init()
             return;
         }
 
-        auto config = _configMgr->getConfig();
+        auto config = _configMgr->getData();
         if (modbusSpeed != config->modbusSpeed) {
             _modbus->changeSpeed(modbusSpeed);
         }
@@ -158,7 +158,7 @@ void Handler::init()
         AsyncResponseStream *response = request->beginResponseStream("application/json");
 
         std::string payload = EDUtils::buildJson([this](JsonObject entity) {
-            auto config = _configMgr->getConfig();
+            auto config = _configMgr->getData();
 
             entity["wifiSSID"] = config->wifiSSID;
             entity["wifiPassword"] = config->wifiPassword;
@@ -196,7 +196,7 @@ void Handler::init()
             return;
         }
 
-        auto config = _configMgr->getConfig();
+        auto config = _configMgr->getData();
         std::strcpy(config->wifiSSID, wifiSSID->value().c_str());
         std::strcpy(config->wifiPassword, wifiPassword->value().c_str());
         config->isAPMode = false;
@@ -218,7 +218,7 @@ void Handler::init()
             return;
         }
 
-        auto config = _configMgr->getConfig();
+        auto config = _configMgr->getData();
         const AsyncWebParameter* host = request->getParam("host", true);
         const AsyncWebParameter* port = request->getParam("port", true);
         const AsyncWebParameter* login = request->getParam("login", true);
