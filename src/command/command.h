@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <FastLED.h>
+#include <color/color.h>
 #include <enum/modes.h>
 
 class Command

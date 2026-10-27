@@ -1,6 +1,6 @@
 #pragma once
 
-#include <FastLED.h>
+#include <color/color.h>
 #include <wirenboard.h>
 #include <device/wb_led.h>
 
