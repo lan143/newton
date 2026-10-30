@@ -19,6 +19,9 @@ public:
     void setWarmFloorSetPoint(float_t setPoint) { _warmFloorSetPoint.setValidValue(setPoint); }
     void setWarmFloorState(bool isActive) { _warmFloorState.setValidValue(isActive); }
 
+    const EDUtils::Nullable<float_t>& warmFloorCurrentTemperature() const { return _warmFloorCurrentTemperature; }
+    const EDUtils::Nullable<bool>& warmFloorState() const { return _warmFloorState; }
+
 private:
     EDUtils::Nullable<float_t> _warmFloorCurrentTemperature = EDUtils::Nullable<float_t>(false, 0.0f);
     EDUtils::Nullable<std::string> _warmFloorMode = EDUtils::Nullable<std::string>(false, "");

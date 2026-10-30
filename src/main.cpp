@@ -13,6 +13,7 @@
 #include <device/wb_led.h>
 #include <device/mtd262mb.h>
 #include <network/network.h>
+#include <network/network_api.h>
 #include <log/log.h>
 #include <sensor/wbmsw_temperature.h>
 #include <sensor/wbmsw_humidity.h>
@@ -28,6 +29,7 @@
 #include "config.h"
 #include "config_migration.h"
 #include "command/command_consumer.h"
+#include "control/light_cache.h"
 #include "state/producer.h"
 #include "state/state_mgr.h"
 #include "sensor/one_wire.h"
@@ -38,6 +40,7 @@
 
 EDConfig::DataMgr<Config> configMgr(new EDConfig::StorageLittleFS<Config>("/config.bin"));
 EDNetwork::NetworkMgr networkMgr;
+EDNetwork::NetworkApi networkApi(networkMgr);
 EDMQTT::MQTT mqtt;
 EDWB::WirenBoard modbus(Serial2);
 
@@ -53,9 +56,19 @@ EDCommon::Sensor::Sensor* co2Sensor = nullptr;
 EDCommon::Sensor::Sensor* lightLevelSensor = nullptr;
 EDCommon::BinarySensor::BinarySensor* presenceSensor = nullptr;
 
+EDCommon::Sensor::Sensor* const* sensorSlots[] = {
+    &temperatureSensor,
+    &humiditySensor,
+    &airQualitySensor,
+    &co2Sensor,
+    &lightLevelSensor,
+};
+
 EDCommon::Light::Light* mainLight = nullptr;
 EDCommon::Light::Light* backLight = nullptr;
 EDCommon::Automation::Light* lightAutomation = nullptr;
+
+LightCache lightCache(&mainLight, &backLight);
 
 OneWire oneWireModbus(&modbus);
 
@@ -63,7 +76,7 @@ Thermostat warmFloor(&configMgr, &discoveryMgr, &stateMgr, &oneWireModbus);
 
 CommandConsumer commandConsumer(&warmFloor);
 
-Handler handler(&configMgr, &networkMgr, &healthCheck, &modbus);
+Handler handler(&configMgr, &networkMgr, &networkApi, &healthCheck, &modbus, sensorSlots, &presenceSensor, &stateMgr, &warmFloor, &lightCache, &mainLight, &backLight, &lightAutomation);
 
 void setup()
 {
@@ -103,6 +116,9 @@ void setup()
     snprintf(warmFloorStateTopic, sizeof(warmFloorStateTopic), "%s/warm_floor/state", configMgr.getData()->mqttTopicPrefix);
     snprintf(warmFloorCommandTopic, sizeof(warmFloorCommandTopic), "%s/warm_floor/set", configMgr.getData()->mqttTopicPrefix);
 
+    lightCache.init(configMgr.getData()->mqttTopicPrefix);
+    lightCache.seedFromFile();
+
     // tmp
     EDUtils::LogConfig networkConfig;
     strcpy(networkConfig.host, "192.168.1.2");
@@ -134,6 +150,7 @@ void setup()
     });
     healthCheck.registerService(&mqtt);
     mqtt.subscribe(&commandConsumer);
+    mqtt.subscribe(lightCache.consumer());
 
     stateProducer.init(warmFloorStateTopic);
 
@@ -263,4 +280,5 @@ void loop()
     warmFloor.loop();
     if (presenceSensor) presenceSensor->update();
     networkLogger.update();
+    lightCache.update();
 }

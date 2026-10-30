@@ -4,34 +4,156 @@
 #include <esp_system.h>
 #include <ExtStrings.h>
 #include <Json.h>
+#include <cmath>
 #include <cstring>
 #include <string.h>
+#include <automation/light.h>
+#include <backup/config_backup_handler.hpp>
+#include <backup/config_file_handler.hpp>
+#include <enum/modes.h>
+#include <log/log.h>
+#include <network/network_api.h>
 #include "defines.h"
-#include "Handler.h"
+#include "handler.h"
+
+namespace
+{
+    const EDConfig::BackupFileSpec BACKUP_FILES[] = {
+        {"config.bin", "/config.bin", sizeof(Config), CURRENT_VERSION, true},
+        {"light_state.bin", "/light_state.bin", sizeof(EDCommon::Automation::LightState), 0, false},
+    };
+
+    constexpr size_t BACKUP_FILE_COUNT = sizeof(BACKUP_FILES) / sizeof(BACKUP_FILES[0]);
+
+    struct SensorSpec
+    {
+        const char* id;
+        const char* name;
+        const char* unit;
+    };
+
+    const SensorSpec SENSOR_SPECS[] = {
+        {"temperature", "Temperature", "°C"},
+        {"humidity", "Humidity", "%"},
+        {"air_quality", "Air quality", ""},
+        {"co2", "CO2", "ppm"},
+        {"light_level", "Light level", "lx"},
+    };
+
+    struct LightSpec
+    {
+        const char* id;
+        const char* name;
+        bool hasColor;
+    };
+
+    const LightSpec LIGHT_SPECS[] = {
+        {"main", "Main light", false},
+        {"back", "Backlight", true},
+    };
+
+    void writeLightJson(JsonObject item, const LightSpec& spec, const LightCache::Snapshot& snap)
+    {
+        item["id"] = spec.id;
+        item["name"] = spec.name;
+        item["hasColor"] = spec.hasColor;
+        item["enabled"] = snap.enabledValid ? snap.enabled : false;
+        item["enabledAvailable"] = snap.enabledValid;
+        item["brightness"] = snap.brightnessValid ? snap.brightness : 0;
+        item["brightnessAvailable"] = snap.brightnessValid;
+        item["temperature"] = snap.temperatureValid ? snap.temperature : 0;
+        item["temperatureAvailable"] = snap.temperatureValid;
+        item["colorAvailable"] = snap.colorValid;
+        item["colorR"] = snap.colorValid ? snap.color.r : 0;
+        item["colorG"] = snap.colorValid ? snap.color.g : 0;
+        item["colorB"] = snap.colorValid ? snap.color.b : 0;
+    }
+
+    bool parseEnabled(const String& value, bool& out)
+    {
+        if (value.equalsIgnoreCase("on") || value.equalsIgnoreCase("true")) {
+            out = true;
+            return true;
+        }
+        if (value.equalsIgnoreCase("off") || value.equalsIgnoreCase("false")) {
+            out = false;
+            return true;
+        }
+        return false;
+    }
+
+    bool parseRgb(const std::string& value, uint8_t& r, uint8_t& g, uint8_t& b)
+    {
+        auto parts = EDUtils::split(value, ",");
+        if (parts.size() != 3) {
+            return false;
+        }
+
+        int ir, ig, ib;
+        if (EDUtils::str2int(&ir, parts[0].c_str(), 10) != EDUtils::STR2INT_SUCCESS
+            || EDUtils::str2int(&ig, parts[1].c_str(), 10) != EDUtils::STR2INT_SUCCESS
+            || EDUtils::str2int(&ib, parts[2].c_str(), 10) != EDUtils::STR2INT_SUCCESS) {
+            return false;
+        }
+
+        if (ir < 0 || ir > 255 || ig < 0 || ig > 255 || ib < 0 || ib > 255) {
+            return false;
+        }
+
+        r = (uint8_t)ir;
+        g = (uint8_t)ig;
+        b = (uint8_t)ib;
+        return true;
+    }
+
+    void rebootAfterCommit()
+    {
+        delay(200);
+        ESP.restart();
+    }
+}
 
 void Handler::init()
 {
     _server->serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
-    _server->serveStatic("/jquery-3.6.0.min.js", LittleFS, "/jquery-3.6.0.min.js");
-    _server->serveStatic("/bootstrap.min.js", LittleFS, "/bootstrap.min.js");
 
     _healthCheck->registerHandlers(_server);
 
-    _server->on("/api/wifi/list", HTTP_GET, [this](AsyncWebServerRequest *request) {
-        /*AsyncResponseStream *response = request->beginResponseStream("application/json");
+    _networkApi->onSettingsChanged([this](const EDNetwork::Config& cfg) {
+        auto config = _configMgr->getData();
 
-        DynamicJsonDocument json(200);
+        strncpy(config->wifiSSID, cfg.wifiSSID, WIFI_SSID_LEN);
+        config->wifiSSID[WIFI_SSID_LEN - 1] = '\0';
+        strncpy(config->wifiPassword, cfg.wifiPassword, WIFI_PWD_LEN);
+        config->wifiPassword[WIFI_PWD_LEN - 1] = '\0';
+        config->isAPMode = cfg.isAPMode;
+        strncpy(config->wifiAPSSID, cfg.wifiAPSSID, WIFI_SSID_LEN);
+        config->wifiAPSSID[WIFI_SSID_LEN - 1] = '\0';
+        config->wifiAPHasPassword = cfg.wifiAPHasPassword;
+        strncpy(config->wifiAPPassword, cfg.wifiAPPassword, WIFI_PWD_LEN);
+        config->wifiAPPassword[WIFI_PWD_LEN - 1] = '\0';
 
-        auto networks = this->_wifiService->getWifiNetworks();
-
-        for (auto i = networks.begin(); i != networks.end(); i++) {
-            json.add(*i);
-        }
-
-        serializeJson(json, *response);
-
-        request->send(response);*/
+        return _configMgr->store();
     });
+    _networkApi->registerRoutes(*_server);
+
+    static EDConfig::ConfigBackupHandler backupHandler({
+        BACKUP_FILES,
+        BACKUP_FILE_COUNT,
+        "newton-config.zip",
+        0,
+        rebootAfterCommit
+    });
+    backupHandler.registerHandlers(_server);
+
+    static EDConfig::ConfigFileHandler configFileHandler({
+        "/config.bin",
+        sizeof(Config),
+        CURRENT_VERSION,
+        true,
+        rebootAfterCommit
+    });
+    configFileHandler.registerHandlers(_server);
 
     _server->on("/api/settings/modbus", HTTP_GET, [this](AsyncWebServerRequest *request) {
         AsyncResponseStream *response = request->beginResponseStream("application/json");
@@ -154,54 +276,23 @@ void Handler::init()
         request->send(200, "application/json", "{}");
     });
 
-    _server->on("/api/settings", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    _server->on("/api/settings/mqtt", HTTP_GET, [this](AsyncWebServerRequest *request) {
         AsyncResponseStream *response = request->beginResponseStream("application/json");
 
         std::string payload = EDUtils::buildJson([this](JsonObject entity) {
             auto config = _configMgr->getData();
 
-            entity["wifiSSID"] = config->wifiSSID;
-            entity["wifiPassword"] = config->wifiPassword;
-            entity["mqttHost"] = config->mqtt.host;
-            entity["mqttPort"] = config->mqtt.port;
-            entity["mqttLogin"] = config->mqtt.login;
-            entity["mqttPassword"] = config->mqtt.password;
+            entity["host"] = config->mqtt.host;
+            entity["port"] = config->mqtt.port;
+            entity["login"] = config->mqtt.login;
+            entity["password"] = config->mqtt.password;
+            entity["haDiscoveryPrefix"] = config->mqttHADiscoveryPrefix;
             entity["mqttIsHADiscovery"] = config->mqttIsHADiscovery;
-            entity["mqttHADiscoveryPrefix"] = config->mqttHADiscoveryPrefix;
-            entity["mqttTopicPrefix"] = config->mqttTopicPrefix;
+            entity["topicPrefix"] = config->mqttTopicPrefix;
         });
 
         response->write(payload.c_str());
         request->send(response);
-    });
-
-    _server->on("/api/settings/wifi", HTTP_POST, [this](AsyncWebServerRequest *request) {
-        if (!request->hasParam("wifiSSID", true) || !request->hasParam("wifiPassword", true)) {
-            request->send(422, "application/json", "{\"message\": \"not present wifiSSID or wifiPassword in request\"}");
-            return;
-        }
-
-        const AsyncWebParameter* wifiSSID = request->getParam("wifiSSID", true);
-        const AsyncWebParameter* wifiPassword = request->getParam("wifiPassword", true);
-
-        if (wifiSSID->value().length() > WIFI_SSID_LEN-1) {
-            request->send(422, "application/json", "{\"message\": \"WiFi SSID lenght more 32 symbols\"}");
-            return;
-        }
-
-        if (wifiPassword->value().length() > WIFI_PWD_LEN-1) {
-            request->send(422, "application/json", "{\"message\": \"WiFi password lenght more 63 symbols\"}");
-            return;
-        }
-
-        auto config = _configMgr->getData();
-        std::strcpy(config->wifiSSID, wifiSSID->value().c_str());
-        std::strcpy(config->wifiPassword, wifiPassword->value().c_str());
-        config->isAPMode = false;
-
-        _configMgr->store();
-
-        request->send(200, "application/json", "{}");
     });
 
     _server->on("/api/settings/mqtt", HTTP_POST, [this](AsyncWebServerRequest *request) {
@@ -212,6 +303,7 @@ void Handler::init()
             || !request->hasParam("password", true)
             || !request->hasParam("haDiscoveryPrefix", true)
             || !request->hasParam("topicPrefix", true)
+            || !request->hasParam("mqttIsHADiscovery", true)
         ) {
             request->send(422, "application/json", "{\"message\": \"not present mqtt params in request\"}");
             return;
@@ -276,6 +368,275 @@ void Handler::init()
         }
 
         _configMgr->store();
+
+        request->send(200, "application/json", "{}");
+    });
+
+    _server->on("/api/sensors", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        AsyncResponseStream *response = request->beginResponseStream("application/json");
+
+        std::string payload = EDUtils::buildJson([this](JsonObject root) {
+            JsonArray sensors = root["sensors"].to<JsonArray>();
+
+            for (size_t i = 0; i < sizeof(SENSOR_SPECS) / sizeof(SENSOR_SPECS[0]); i++) {
+                JsonObject item = sensors.add<JsonObject>();
+                item["id"] = SENSOR_SPECS[i].id;
+                item["name"] = SENSOR_SPECS[i].name;
+                item["unit"] = SENSOR_SPECS[i].unit;
+
+                EDCommon::Sensor::Sensor* sensor = _sensors[i] != nullptr ? *_sensors[i] : nullptr;
+                if (sensor != nullptr) {
+                    auto value = sensor->getValue();
+                    item["available"] = value.second;
+                    item["value"] = value.second ? value.first : 0.0f;
+                } else {
+                    item["available"] = false;
+                    item["value"] = 0.0f;
+                }
+            }
+
+            {
+                JsonObject item = sensors.add<JsonObject>();
+                item["id"] = "human_detected_1";
+                item["name"] = "Human detected 1";
+                item["unit"] = "";
+
+                EDCommon::BinarySensor::BinarySensor* presence = _presence != nullptr ? *_presence : nullptr;
+                if (presence != nullptr) {
+                    auto active = presence->isActive();
+                    item["available"] = active.second;
+                    item["value"] = active.second ? active.first : false;
+                } else {
+                    item["available"] = false;
+                    item["value"] = false;
+                }
+            }
+
+            JsonObject warmFloor = root["warmFloor"].to<JsonObject>();
+            auto thermostatState = _configMgr->getData()->thermostatState;
+            warmFloor["mode"] = thermostatState.mode == THERMOSTAT_MODE_HEAT ? "heat" : "off";
+            warmFloor["setPoint"] = thermostatState.setPoint;
+
+            if (_stateMgr != nullptr) {
+                auto& state = _stateMgr->getState();
+                auto& currentTemperature = state.warmFloorCurrentTemperature();
+                warmFloor["currentTemperatureAvailable"] = currentTemperature.Valid();
+                warmFloor["currentTemperature"] = currentTemperature.Valid() ? currentTemperature.Value() : 0.0f;
+
+                auto& heating = state.warmFloorState();
+                warmFloor["heating"] = heating.Valid() ? heating.Value() : false;
+            } else {
+                warmFloor["currentTemperatureAvailable"] = false;
+                warmFloor["currentTemperature"] = 0.0f;
+                warmFloor["heating"] = false;
+            }
+
+            JsonArray lights = root["lights"].to<JsonArray>();
+
+            const LightCache::Snapshot emptySnapshot;
+            const LightCache::Snapshot* mainSnapshot = &emptySnapshot;
+            const LightCache::Snapshot* backSnapshot = &emptySnapshot;
+
+            if (_lightCache != nullptr) {
+                mainSnapshot = &_lightCache->mainSnapshot();
+                backSnapshot = &_lightCache->backSnapshot();
+            }
+
+            writeLightJson(lights.add<JsonObject>(), LIGHT_SPECS[0], *mainSnapshot);
+            writeLightJson(lights.add<JsonObject>(), LIGHT_SPECS[1], *backSnapshot);
+
+            JsonObject nightMode = root["nightMode"].to<JsonObject>();
+            if (_lightCache != nullptr && _lightCache->nightModeValid()) {
+                nightMode["value"] = _lightCache->nightMode();
+                nightMode["available"] = true;
+            } else {
+                nightMode["value"] = false;
+                nightMode["available"] = false;
+            }
+        });
+
+        response->write(payload.c_str());
+        request->send(response);
+    });
+
+    _server->on("/api/warm_floor/set", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        const bool hasMode = request->hasParam("warmFloorMode", true);
+        const bool hasSetPoint = request->hasParam("warmFloorSetPoint", true);
+
+        if (!hasMode && !hasSetPoint) {
+            request->send(422, "application/json", "{\"message\": \"not present warmFloorMode or warmFloorSetPoint in request\"}");
+            return;
+        }
+
+        EDHA::Mode mode = EDHA::MODE_OFF;
+        if (hasMode) {
+            const AsyncWebParameter* modeParam = request->getParam("warmFloorMode", true);
+            if (modeParam->value().equalsIgnoreCase("off")) {
+                mode = EDHA::MODE_OFF;
+            } else if (modeParam->value().equalsIgnoreCase("heat")) {
+                mode = EDHA::MODE_HEAT;
+            } else {
+                request->send(422, "application/json", "{\"message\": \"unknown warmFloorMode\"}");
+                return;
+            }
+        }
+
+        float_t setPoint = 0.0f;
+        if (hasSetPoint) {
+            const AsyncWebParameter* setPointParam = request->getParam("warmFloorSetPoint", true);
+            if (EDUtils::str2float(&setPoint, setPointParam->value().c_str()) != EDUtils::STR2INT_SUCCESS) {
+                request->send(422, "application/json", "{\"message\": \"incorrect warmFloorSetPoint\"}");
+                return;
+            }
+            if (!std::isfinite(setPoint)) {
+                request->send(422, "application/json", "{\"message\": \"incorrect warmFloorSetPoint\"}");
+                return;
+            }
+        }
+
+        if (hasMode) {
+            _warmFloor->changeMode(mode);
+        }
+
+        if (hasSetPoint) {
+            _warmFloor->changeSetPoint(setPoint);
+        }
+
+        LOGI("warm_floor", "set mode: %s, setPoint: %.2f",
+            hasMode ? (mode == EDHA::MODE_HEAT ? "heat" : "off") : "-",
+            hasSetPoint ? setPoint : 0.0f);
+
+        request->send(200, "application/json", "{}");
+    });
+
+    _server->on("/api/light/set", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        if (!request->hasParam("light", true)) {
+            request->send(422, "application/json", "{\"message\": \"not present light param in request\"}");
+            return;
+        }
+
+        const AsyncWebParameter* lightParam = request->getParam("light", true);
+
+        bool isMain;
+        if (lightParam->value().equalsIgnoreCase("main")) {
+            isMain = true;
+        } else if (lightParam->value().equalsIgnoreCase("back")) {
+            isMain = false;
+        } else {
+            request->send(422, "application/json", "{\"message\": \"unknown light\"}");
+            return;
+        }
+
+        const bool hasEnabled = request->hasParam("enabled", true);
+        const bool hasBrightness = request->hasParam("brightness", true);
+        const bool hasTempColor = request->hasParam("tempColor", true);
+        const bool hasColor = request->hasParam("color", true);
+
+        if (!hasEnabled && !hasBrightness && !hasTempColor && !hasColor) {
+            request->send(422, "application/json", "{\"message\": \"not present control params in request\"}");
+            return;
+        }
+
+        bool enable = false;
+        if (hasEnabled) {
+            const AsyncWebParameter* enabledParam = request->getParam("enabled", true);
+            if (!parseEnabled(enabledParam->value(), enable)) {
+                request->send(422, "application/json", "{\"message\": \"incorrect enabled value\"}");
+                return;
+            }
+        }
+
+        int brightness = 0;
+        if (hasBrightness) {
+            const AsyncWebParameter* brightnessParam = request->getParam("brightness", true);
+            if (EDUtils::str2int(&brightness, brightnessParam->value().c_str(), 10) != EDUtils::STR2INT_SUCCESS
+                || brightness < 0 || brightness > 100) {
+                request->send(422, "application/json", "{\"message\": \"incorrect brightness value\"}");
+                return;
+            }
+        }
+
+        int tempColor = 0;
+        if (hasTempColor) {
+            const AsyncWebParameter* tempColorParam = request->getParam("tempColor", true);
+            if (EDUtils::str2int(&tempColor, tempColorParam->value().c_str(), 10) != EDUtils::STR2INT_SUCCESS
+                || tempColor < 2700 || tempColor > 6000) {
+                request->send(422, "application/json", "{\"message\": \"incorrect tempColor value\"}");
+                return;
+            }
+        }
+
+        uint8_t colorR = 0, colorG = 0, colorB = 0;
+        if (hasColor) {
+            const AsyncWebParameter* colorParam = request->getParam("color", true);
+            if (!parseRgb(colorParam->value().c_str(), colorR, colorG, colorB)) {
+                request->send(422, "application/json", "{\"message\": \"incorrect color value\"}");
+                return;
+            }
+        }
+
+        if (isMain && hasColor) {
+            request->send(422, "application/json", "{\"message\": \"main light has no color control\"}");
+            return;
+        }
+
+        EDCommon::Light::Light* light = isMain
+            ? (_mainLight != nullptr ? *_mainLight : nullptr)
+            : (_backLight != nullptr ? *_backLight : nullptr);
+
+        if (light == nullptr) {
+            request->send(500, "application/json", "{\"message\": \"light not ready\"}");
+            return;
+        }
+
+        if (hasEnabled) {
+            light->setState(enable);
+        }
+        if (hasBrightness) {
+            light->setBrightness((uint8_t)brightness);
+        }
+        if (hasTempColor) {
+            light->setTemperature((uint16_t)tempColor);
+        }
+        if (hasColor) {
+            light->setColor(CRGB(colorR, colorG, colorB));
+        }
+
+        LOGI("light", "set %s enabled=%d brightness=%d tempColor=%d color=%d,%d,%d",
+            isMain ? "main" : "back",
+            hasEnabled ? (enable ? 1 : 0) : -1,
+            hasBrightness ? brightness : -1,
+            hasTempColor ? tempColor : -1,
+            hasColor ? colorR : -1,
+            hasColor ? colorG : -1,
+            hasColor ? colorB : -1);
+
+        request->send(200, "application/json", "{}");
+    });
+
+    _server->on("/api/light_automation/set", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        if (!request->hasParam("enabled", true)) {
+            request->send(422, "application/json", "{\"message\": \"not present enabled param in request\"}");
+            return;
+        }
+
+        const AsyncWebParameter* enabledParam = request->getParam("enabled", true);
+
+        bool enable;
+        if (!parseEnabled(enabledParam->value(), enable)) {
+            request->send(422, "application/json", "{\"message\": \"incorrect enabled value\"}");
+            return;
+        }
+
+        EDCommon::Automation::Light* automation = _automation != nullptr ? *_automation : nullptr;
+        if (automation == nullptr) {
+            request->send(500, "application/json", "{\"message\": \"light automation not ready\"}");
+            return;
+        }
+
+        automation->changeNightModeState(enable);
+
+        LOGI("light_automation", "set nightMode=%s", enable ? "true" : "false");
 
         request->send(200, "application/json", "{}");
     });

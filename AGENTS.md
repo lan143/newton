@@ -36,6 +36,8 @@ src/
 ├── command/
 │   ├── command.h/.cpp    Parses warm-floor command JSON (mode, setPoint)
 │   └── command_consumer.*  Subscribes to <prefix>/warm_floor/set
+├── control/
+│   └── light_cache.h/.cpp  LightCache: loopTask-refreshed (≤500 ms) light snapshot; night-mode mirrored from <prefix>/light_automation/state consumer + /light_state.bin byte-0 boot seed
 ├── sensor/one_wire.h/.cpp  WB-M1W2 1-Wire channel 1 for warm-floor temperature
 ├── state/
 │   ├── state.h/.cpp      Warm-floor State with EDUtils::Nullable fields and marshalJSON()
@@ -44,15 +46,16 @@ src/
 ├── thermostat/
 │   ├── thermostat.h/.cpp Warm-floor on/off, hysteresis, sensor-fault protection
 │   └── state.h           Persisted ThermostatState (mode, setPoint, isActive)
-└── web/handler.h/.cpp    Async web server :80, JSON API, LittleFS static files
-data/                     Web UI + vendored minified jquery/bootstrap
+└── web/handler.h/.cpp    Async web server :80, JSON API, NetworkApi + config-backup routes, LittleFS static files
+data/                     Preact+Vite web UI build output (source in frontend/)
+frontend/                 Preact + TypeScript + Vite SPA; `npm run build` -> data/
 ```
 
 Wiring: every Newton subsystem is a global in `main.cpp`, dependencies are constructor-injected (no service locator, no dynamic registration). Light, sensors, presence and automation are `EDCommon` objects from `ed-common`, created in `setup()` with the option pattern after device/MQTT/Modbus init; they share the configured topic prefix and HA device. Add a Newton subsystem by constructing it globally and injecting what it needs.
 
 `setup()` order: random seed → unconditional 10 s delay → `Serial` → LittleFS (returns early on failure) → config defaults → `migrateConfigV1ToV2` → config load → warm-floor topics → network logger → `Serial2` + `modbus.init(15)` → network → ArduinoOTA → `CommandConsumer` → MQTT → MQTT healthcheck → `StateProducer` → web → HA discovery/device → Modbus devices → 5 EDCommon sensors → presence → 1-Wire → main light → backlight → light automation → thermostat.
 
-`loop()` order: `networkMgr`, `discoveryMgr`, `ArduinoOTA.handle`, `healthCheck`, the 5 sensor `update()` calls, `stateMgr.loop()`, `mainLight`, `backLight`, `lightAutomation`, `warmFloor.loop()`, `presenceSensor.update()`, `networkLogger.update()`. Preserve it unless a change requires it.
+`loop()` order: `networkMgr`, `discoveryMgr`, `ArduinoOTA.handle`, `healthCheck`, the 5 sensor `update()` calls, `stateMgr.loop()`, `mainLight`, `backLight`, `lightAutomation`, `warmFloor.loop()`, `presenceSensor.update()`, `networkLogger.update()`, `lightCache.update()`. Preserve it unless a change requires it.
 
 Data flow: EDCommon sensors and the presence binary sensor publish retained plain-number/`true`/`false` topics per entity on change plus a 60 s heartbeat. EDCommon lights publish non-retained per-light JSON on change plus a 60 s heartbeat; the light automation subscribes to `<prefix>/light_automation/set` and persists state in `/light_state.bin`. Warm floor keeps Newton's `StateMgr`/`StateProducer`: `State` holds only the four `warmFloor*` fields and publishes `<prefix>/warm_floor/state` non-retained on change; `<prefix>/warm_floor/set` → `CommandConsumer` → `Thermostat` → relay over Modbus. HA discovery comes from `EDHA::DiscoveryMgr`; one device is created in `setup()` and shared by all registrations.
 
@@ -112,6 +115,26 @@ Warm-floor state keys (`src/state/state.cpp`): `warmFloorCurrentTemperature`, `w
 
 Warm-floor command keys (`src/command/command.cpp`): `warmFloorMode` (`"off"`/`"heat"`), `warmFloorSetPoint` (Thermostat clamps 16–40). Newton itself no longer handles light commands.
 
+### HTTP API
+
+Wi-Fi editing moved out of Newton's own handlers: the Network tab drives `EDNetwork::NetworkApi`, and settings persist through the `onSettingsChanged` callback into `Config` then apply live. Newton no longer serves the legacy `GET /api/settings` / `POST /api/settings/wifi` routes (replaced by `GET /api/settings/mqtt` and `/api/network/*`).
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/status` | GET | `{wifiStatus,freeHeap,uptime,lastResetReason}` |
+| `/api/reboot` | POST | replies `{}` then restarts |
+| `/healthcheck/healty` | GET | `{healty:true}` (misspelling is the ed-healthcheck convention) |
+| `/healthcheck/ready` | GET | `200 {ready:true,...}` / `500 {ready:false,message}` (services: mqtt, warmFloor) |
+| `/api/settings/modbus` | GET/POST | speed enum + five addresses; POST requires all six, addresses 1–254; speed applies live, addresses after reboot |
+| `/api/settings/mqtt` | GET/POST | `host,port,login,password,haDiscoveryPrefix,mqttIsHADiscovery,topicPrefix`; POST must always send `mqttIsHADiscovery` (`"true"`/`"false"`) |
+| `/api/sensors` | GET | cached snapshot: six sensors + `warmFloor` state + `lights[]` (main/back) + `nightMode{value,available}`. Each light: `id,name,hasColor,enabled,enabledAvailable,brightness(0-100),brightnessAvailable,temperature(Kelvin),temperatureAvailable,colorAvailable,colorR,colorG,colorB` |
+| `/api/warm_floor/set` | POST | form `warmFloorMode` (`"off"`/`"heat"`) and/or `warmFloorSetPoint` (16–40); at least one required |
+| `/api/light/set` | POST | form `light` (main/back) + ≥1 of `enabled` ("on"/"off"), `brightness` (0–100), `tempColor` (2700–6000), `color` ("r,g,b" 0–255). `color` rejected for main; 422 on invalid, 500 "light not ready" pre-setup |
+| `/api/light_automation/set` | POST | form `enabled` ("on"/"off"/"true"/"false") → night-mode switch |
+| `/api/config/backup` | GET/POST | ed-config archive (zip); registered before `/api/config` |
+| `/api/config` | GET/POST | ed-config raw config file |
+| `/api/network/settings`, `/api/network/status`, `/api/wifi/list` | GET/POST | ed-network `NetworkApi` |
+
 ## 5. Invariants and rules
 
 - **Config is raw binary.** `Config` uses `EDConfig::DataMgr` + `StorageLittleFS("/config.bin")`, currently `CURRENT_VERSION = 2`. A one-shot `migrateConfigV1ToV2()` (exact v1 size + CRC) copies the old layout, derives the topic prefix by stripping `/state` from the old state topic (default fallback), and seeds `/light_state.bin` from the embedded light state. Corrupt or absent v1 files fall back to fresh defaults. Reordering/changing fields still breaks stored configs; add migration before layout changes and never "just bump" the version.
@@ -124,17 +147,19 @@ Warm-floor command keys (`src/command/command.cpp`): `warmFloorMode` (`"off"`/`"
 - **Compiler:** `-Wshadow` is on in every env; do not shadow. English comments and identifiers only.
 - **MQTT:** EDCommon sensors and presence publish retained; EDCommon lights and the light-automation night-mode state publish non-retained; Newton's warm-floor aggregate state is non-retained. Do not switch retention without considering HA stale-state behavior.
 - **Brightness:** EDCommon lights and automation state use 0–100 (HA scale 100); the old 0–255 `LightState` unit is gone.
-- **Vendored:** never edit `data/jquery-3.6.0.min.js`, `data/bootstrap.min.js`, `data/bootstrap.min.css`, or `.pio/libdeps`.
+- **Vendored:** never edit `.pio/libdeps`. `data/` is build output from `frontend/` — edit the frontend source and run `npm run build` instead of touching `data/` by hand.
 
 ## 6. Known bugs and caveats
 
 - `src/thermostat/thermostat.cpp:13` — the second clause `MIN_TEMPERATURE > MAX_TEMPERATURE` is always false; it should compare `_state.setPoint > MAX_TEMPERATURE`. A stored setpoint above 40 is not reset.
-- `GET /api/settings` returns Wi-Fi and MQTT passwords in plaintext; the web server has no authentication. Trusted LAN only.
+- `GET /api/settings/mqtt` returns the MQTT password in plaintext; the web server has no authentication. Wi-Fi credentials are no longer exposed by any settings endpoint (the Network tab's ed-network API returns only `hasWifiPassword`/`hasWifiAPPassword` flags). Trusted LAN only.
 - ArduinoOTA uses a hardcoded password in `src/main.cpp`; the upload auth value is in `platformio.ini`. Reference locations, never values.
 - `setup()` waits 10 s unconditionally and returns early if LittleFS mount fails (`src/main.cpp`).
 - Network logger is temporary: `192.168.1.2:5555`, `/_bulk`, marked `// tmp`.
 - Ethernet constants exist, but `hasEth = false`; current firmware is Wi-Fi only.
-- `data/index.html` exposes status/settings, not light/thermostat control.
+- Wi-Fi AP password edited through the Network tab is persisted to `/config.bin` but not re-applied on boot because `Config::asNetworkConfig()` (`src/config.h`) does not copy `wifiAPPassword`. Reference locations, never values.
+- Night-mode display (`/api/sensors` `nightMode`) is mirrored from the `<prefix>/light_automation/state` MQTT echo plus a `/light_state.bin` byte-0 boot seed. Without a broker the value stays at the boot seed (or `available:false` if the file is missing) and never tracks live changes.
+- Light brightness in the HTTP API and UI is 0–100 (HA scale 100), unlike the legacy 0–255 unit.
 
 ## 7. Style and definition of done
 
