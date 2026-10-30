@@ -14,7 +14,7 @@ ed-* libraries), so filtering is especially useful.
 | Dev-name build (`Newton dev`) | `rtk err pio run -e kc868a2_dev` |
 | Upload web UI to LittleFS | `rtk err pio run -e kc868a2 -t uploadfs` |
 | USB firmware upload | `rtk err pio run -e kc868a2 -t upload` |
-| OTA upload (`192.168.1.43`) | `rtk err pio run -e kc868a2_ota -t upload` |
+| OTA upload (target from `.env`) | `rtk err pio run -e kc868a2_ota -t upload` |
 | Working tree / history | `rtk git status`, `rtk git log --oneline -10` |
 | Review a change | `rtk diff` |
 | Find a symbol/key | `rtk grep -rn "warmFloorSetPoint" src` |
@@ -54,7 +54,7 @@ Notes:
   (115200 8N1). Do not pipe it through a filter.
 - `pio run -e kc868a2 -t uploadfs` rewrites the LittleFS image; it does not
   build the firmware. Run the normal build/upload too when both changed.
-- OTA targets the address and auth value configured in `platformio.ini`; never
-  print or copy the auth value into logs or docs.
+- OTA reads the address and auth value from the untracked `.env`; never print
+  or copy the auth value into logs or docs.
 - Batch related reads/greps into one shell call to avoid extra turns. There is
   no test command to filter — `pio run -e kc868a2` is the only automated check.

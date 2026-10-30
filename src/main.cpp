@@ -246,7 +246,8 @@ void setup()
     }
     backLight = backLightRGBW;
 
-    lightAutomation = new EDCommon::Automation::Light(mainLight, backLight, presenceSensor);
+    // Backlight is physically absent and temporarily excluded; ed-common then applies night mode to the main light.
+    lightAutomation = new EDCommon::Automation::Light(mainLight, nullptr, presenceSensor);
     if (!lightAutomation->init("/light_state.bin", {
             EDCommon::Automation::withMQTT(&mqtt, prefix, "newton", "Light automation"),
             EDCommon::Automation::withDiscovery(&discoveryMgr, device),

@@ -17,13 +17,13 @@ pio run -e kc868a2                 # production build
 pio run -e kc868a2_dev             # same code, CONTROLLER_NAME="Newton dev"
 pio run -e kc868a2 -t upload       # USB upload
 pio run -e kc868a2 -t uploadfs     # data/ (web UI) to LittleFS — required for the UI
-pio run -e kc868a2_ota -t upload   # OTA; upload_port/--auth live in platformio.ini
+pio run -e kc868a2_ota -t upload   # OTA; target/credentials from untracked /.env
 pio device monitor -e kc868a2      # serial monitor, 115200 8N1
 ```
 
 `ed-common` is pinned to git tag `0.3.1` in lib_deps (upstream https://github.com/lan143/ed-common); the local sibling checkout, when present, is for library development only and is not used by the build.
 
-The OTA env targets `192.168.1.43` and carries an auth value in `platformio.ini`; never copy that value into docs, logs or commits.
+The OTA env reads its target and credentials from the untracked project-root `/.env` via `scripts/ota_env.py`; never copy those values into docs, logs or commits.
 
 ## 3. Architecture map
 
@@ -153,12 +153,13 @@ Wi-Fi editing moved out of Newton's own handlers: the Network tab drives `EDNetw
 
 - `src/thermostat/thermostat.cpp:13` — the second clause `MIN_TEMPERATURE > MAX_TEMPERATURE` is always false; it should compare `_state.setPoint > MAX_TEMPERATURE`. A stored setpoint above 40 is not reset.
 - `GET /api/settings/mqtt` returns the MQTT password in plaintext; the web server has no authentication. Wi-Fi credentials are no longer exposed by any settings endpoint (the Network tab's ed-network API returns only `hasWifiPassword`/`hasWifiAPPassword` flags). Trusted LAN only.
-- ArduinoOTA uses a hardcoded password in `src/main.cpp`; the upload auth value is in `platformio.ini`. Reference locations, never values.
+- ArduinoOTA uses a hardcoded password in `src/main.cpp`; the upload auth value is in the untracked `/.env`. Reference locations, never values.
 - `setup()` waits 10 s unconditionally and returns early if LittleFS mount fails (`src/main.cpp`).
 - Network logger is temporary: `192.168.1.2:5555`, `/_bulk`, marked `// tmp`.
 - Ethernet constants exist, but `hasEth = false`; current firmware is Wi-Fi only.
 - Wi-Fi AP password edited through the Network tab is persisted to `/config.bin` but not re-applied on boot because `Config::asNetworkConfig()` (`src/config.h`) does not copy `wifiAPPassword`. Reference locations, never values.
 - Night-mode display (`/api/sensors` `nightMode`) is mirrored from the `<prefix>/light_automation/state` MQTT echo plus a `/light_state.bin` byte-0 boot seed. Without a broker the value stays at the boot seed (or `available:false` if the file is missing) and never tracks live changes.
+- The backlight (WB-LED2 at address 4) is physically absent, so it is temporarily excluded from `EDCommon::Automation::Light` (`src/main.cpp`, `nullptr` second ctor arg); night mode now falls back to the main light, while the backlight object keeps its MQTT/HA/UI presence.
 - Light brightness in the HTTP API and UI is 0–100 (HA scale 100), unlike the legacy 0–255 unit.
 
 ## 7. Style and definition of done
