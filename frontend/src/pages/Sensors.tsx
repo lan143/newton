@@ -97,7 +97,7 @@ export function SensorsPage() {
             {snapshot.warmFloor.currentTemperatureAvailable ? (
               <span class="sensor-value">
                 {snapshot.warmFloor.currentTemperature.toFixed(1)}
-                <span class="sensor-unit">\u00B0C</span>
+                <span class="sensor-unit">°C</span>
               </span>
             ) : (
               <span class="sensor-value sensor-unavailable">no data</span>

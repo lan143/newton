@@ -177,7 +177,7 @@ function WarmFloorCard({
           disabled={saving}
         />
         <Field
-          label="Setpoint (\u00B0C)"
+          label="Setpoint (°C)"
           value={setPoint}
           onInput={setSetPoint}
           type="number"
@@ -185,7 +185,7 @@ function WarmFloorCard({
           max={LIMITS.warmFloor.setPointMax}
           step={0.5}
           inputMode="decimal"
-          help="Between 16 and 40 \u00B0C."
+          help="Between 16 and 40 °C."
           disabled={saving}
         />
         {saveError ? (
