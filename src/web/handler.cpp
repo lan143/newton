@@ -168,9 +168,7 @@ void Handler::init()
             entity["mqttPassword"] = config->mqtt.password;
             entity["mqttIsHADiscovery"] = config->mqttIsHADiscovery;
             entity["mqttHADiscoveryPrefix"] = config->mqttHADiscoveryPrefix;
-            entity["mqttCommandTopic"] = config->mqttCommandTopic;
-            entity["mqttLightSwitchCommandTopic"] = config->mqttLightSwitchCommandTopic;
-            entity["mqttStateTopic"] = config->mqttStateTopic;
+            entity["mqttTopicPrefix"] = config->mqttTopicPrefix;
         });
 
         response->write(payload.c_str());
@@ -213,6 +211,7 @@ void Handler::init()
             || !request->hasParam("login", true)
             || !request->hasParam("password", true)
             || !request->hasParam("haDiscoveryPrefix", true)
+            || !request->hasParam("topicPrefix", true)
         ) {
             request->send(422, "application/json", "{\"message\": \"not present mqtt params in request\"}");
             return;
@@ -225,9 +224,7 @@ void Handler::init()
         const AsyncWebParameter* password = request->getParam("password", true);
         const AsyncWebParameter* haDiscoveryPrefix = request->getParam("haDiscoveryPrefix", true);
         const AsyncWebParameter* ishaDiscoveryEnabled = request->getParam("mqttIsHADiscovery", true);
-        const AsyncWebParameter* stateTopic = request->getParam("stateTopic", true);
-        const AsyncWebParameter* commandTopic = request->getParam("commandTopic", true);
-        const AsyncWebParameter* lightCommandTopic = request->getParam("lightSwitchCommandTopic", true);
+        const AsyncWebParameter* topicPrefix = request->getParam("topicPrefix", true);
 
         if (host->value().length() == 0 || host->value().length() > HOST_LEN-1) {
             request->send(422, "application/json", "{\"message\": \"MQTT host lenght invalid\"}");
@@ -260,18 +257,8 @@ void Handler::init()
             return;
         }
 
-        if (stateTopic->value().length() == 0 || stateTopic->value().length() > MQTT_TOPIC_LEN-1) {
-            request->send(422, "application/json", "{\"message\": \"state topic length invalid\"}");
-            return;
-        }
-
-        if (commandTopic->value().length() == 0 || commandTopic->value().length() > MQTT_TOPIC_LEN-1) {
-            request->send(422, "application/json", "{\"message\": \"command topic length invalid\"}");
-            return;
-        }
-
-        if (lightCommandTopic->value().length() == 0 || lightCommandTopic->value().length() > MQTT_TOPIC_LEN-1) {
-            request->send(422, "application/json", "{\"message\": \"light command topic length invalid\"}");
+        if (topicPrefix->value().length() == 0 || topicPrefix->value().length() > MQTT_TOPIC_PREFIX_MAX_LEN) {
+            request->send(422, "application/json", "{\"message\": \"topic prefix length invalid\"}");
             return;
         }
 
@@ -280,9 +267,7 @@ void Handler::init()
         strcpy(config->mqtt.login, login->value().c_str());
         strcpy(config->mqtt.password, password->value().c_str());
         strcpy(config->mqttHADiscoveryPrefix, haDiscoveryPrefix->value().c_str());
-        strcpy(config->mqttStateTopic, stateTopic->value().c_str());
-        strcpy(config->mqttCommandTopic, commandTopic->value().c_str());
-        strcpy(config->mqttLightSwitchCommandTopic, lightCommandTopic->value().c_str());
+        snprintf(config->mqttTopicPrefix, MQTT_TOPIC_LEN, "%s", topicPrefix->value().c_str());
 
         if (strcmp(ishaDiscoveryEnabled->value().c_str(), "true") == 0) {
             config->mqttIsHADiscovery = true;

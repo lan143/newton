@@ -4,10 +4,9 @@
 #include <WiFi.h>
 #include <mqtt_config.h>
 #include <network/network_config.h>
-#include "automation/light_state.h"
 #include "thermostat/state.h"
 
-#define CURRENT_VERSION 1
+#define CURRENT_VERSION 2
 
 #define WIFI_SSID_LEN 32 + 1
 #define WIFI_PWD_LEN 64 + 1
@@ -18,6 +17,7 @@
 #define MQTT_LOGIN_LEN 32
 #define MQTT_PASSWORD_LEN 32
 #define MQTT_TOPIC_LEN 64
+#define MQTT_TOPIC_PREFIX_MAX_LEN 46 // keeps prefix + "/warm_floor/state" (17) + NUL inside EDMQTT::Producer::_topic[64]
 
 struct Config
 {
@@ -36,9 +36,7 @@ struct Config
 
     bool mqttIsHADiscovery = true;
     char mqttHADiscoveryPrefix[MQTT_TOPIC_LEN] = {0};
-    char mqttCommandTopic[MQTT_TOPIC_LEN] = {0};
-    char mqttLightSwitchCommandTopic[MQTT_TOPIC_LEN] = {0};
-    char mqttStateTopic[MQTT_TOPIC_LEN] = {0};
+    char mqttTopicPrefix[MQTT_TOPIC_LEN] = {0};
 
     // modbus
     uint32_t modbusSpeed = 0;
@@ -47,9 +45,6 @@ struct Config
     uint8_t addressWBLED2 = 0;
     uint8_t addressWBM1W2 = 0;
     uint8_t addressMTD262MB = 0;
-
-    // Light
-    LightState lightState;
 
     ThermostatState thermostatState;
 

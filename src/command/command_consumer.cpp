@@ -13,31 +13,6 @@ void CommandConsumer::consume(std::string payload)
         return;
     }
 
-    if (command.hasLightNightMode()) {
-        _lightAutomation->changeNightModeState(command.isLightNightMode());
-    }
-
-    if (command.hasLightBrightness()) {
-        _lightAutomation->setBrightness(command.getLightBightness());
-    }
-
-    if (command.hasLightColor()) {
-        _lightAutomation->setColor(command.getLightColor());
-    }
-
-    if (command.hasLightTempColor()) {
-        uint16_t temperature = command.getLightTempColor();
-        if (temperature < 2700) {
-            temperature = 2700;
-        }
-
-        if (temperature > 6000) {
-            temperature = 6000;
-        }
-
-        _lightAutomation->setColorTemperature(temperature);
-    }
-
     if (command.hasWarmFloorMode()) {
         _warmFloor->changeMode(command.getWarmFloorMode());
     }

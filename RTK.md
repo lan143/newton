@@ -17,9 +17,9 @@ ed-* libraries), so filtering is especially useful.
 | OTA upload (`192.168.1.43`) | `rtk err pio run -e kc868a2_ota -t upload` |
 | Working tree / history | `rtk git status`, `rtk git log --oneline -10` |
 | Review a change | `rtk diff` |
-| Find a symbol/key | `rtk grep -rn "lightBrightness" src` |
+| Find a symbol/key | `rtk grep -rn "warmFloorSetPoint" src` |
 | Find files by name | `rtk find src -name '*.h'` |
-| Skim a source file | `rtk read src/automation/light.cpp` |
+| Skim a source file | `rtk read src/config_migration.cpp` |
 | Inspect a dependency API | `rtk grep -rn "changeSpeed" .pio/libdeps/kc868a2/ed-wb/src` |
 | Dependency summary | `rtk deps` |
 | Compact JSON payload | `rtk json` |
@@ -40,8 +40,8 @@ Notes:
 - Search source with `rtk grep -rn "<pattern>" src`; use `rtk rg` if you prefer
   ripgrep semantics (respects `.gitignore`, faster on `.pio`).
 - Library APIs are the usual unknown: grep the checked-out dependency under
-  `.pio/libdeps/kc868a2/<lib>/src`. The ed-* libraries track git master, so the
-  local checkout is the only trustworthy signature.
+  `.pio/libdeps/kc868a2/<lib>/src`. `ed-common` is pinned to tag `0.3.1` from
+  git; all checked-out sources live under `.pio/libdeps/kc868a2/<lib>/src`.
 - Do not run `rtk read` on vendored minified assets
   (`data/*.min.js`, `data/*.min.css`); it is noise and can hide nothing useful.
 - If filtered output omits something you need, recover it with

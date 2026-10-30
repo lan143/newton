@@ -11,20 +11,25 @@
 #include <wirenboard.h>
 #include <device/wb_msw.h>
 #include <device/wb_led.h>
+#include <device/mtd262mb.h>
 #include <network/network.h>
 #include <log/log.h>
+#include <sensor/wbmsw_temperature.h>
+#include <sensor/wbmsw_humidity.h>
+#include <sensor/wbmsw_air_quality.h>
+#include <sensor/wbmsw_co2.h>
+#include <sensor/wbmsw_light_level.h>
+#include <binary_sensor/mtd262mb.h>
+#include <light/wb_led_cct.h>
+#include <light/wb_led_rgbw.h>
+#include <automation/light.h>
 
 #include "defines.h"
 #include "config.h"
-#include "automation/light.h"
+#include "config_migration.h"
 #include "command/command_consumer.h"
-#include "command/switch_command_consumer.h"
-#include "light/backlight.h"
-#include "light/main.h"
 #include "state/producer.h"
 #include "state/state_mgr.h"
-#include "sensor/complex.h"
-#include "sensor/mtd262mb.h"
 #include "sensor/one_wire.h"
 #include "state/state.h"
 #include "state/producer.h"
@@ -41,19 +46,22 @@ EDHA::DiscoveryMgr discoveryMgr;
 StateProducer stateProducer(&mqtt);
 EDUtils::StateMgr<State> stateMgr(&stateProducer);
 
-MainLight mainLight(&modbus);
-Backlight backlight(&modbus);
+EDCommon::Sensor::Sensor* temperatureSensor = nullptr;
+EDCommon::Sensor::Sensor* humiditySensor = nullptr;
+EDCommon::Sensor::Sensor* airQualitySensor = nullptr;
+EDCommon::Sensor::Sensor* co2Sensor = nullptr;
+EDCommon::Sensor::Sensor* lightLevelSensor = nullptr;
+EDCommon::BinarySensor::BinarySensor* presenceSensor = nullptr;
 
-ComplexSensor complexSensor(&discoveryMgr, &stateMgr, &modbus);
-MTD262MB mtd262mb(modbus.getClient(), &discoveryMgr, &stateMgr);
+EDCommon::Light::Light* mainLight = nullptr;
+EDCommon::Light::Light* backLight = nullptr;
+EDCommon::Automation::Light* lightAutomation = nullptr;
+
 OneWire oneWireModbus(&modbus);
 
 Thermostat warmFloor(&configMgr, &discoveryMgr, &stateMgr, &oneWireModbus);
 
-LightAutomation lightAutomation(&configMgr, &discoveryMgr, &backlight, &mainLight, &stateMgr);
-
-SwitchCommandConsumer lightSwitchConsumer(&lightAutomation);
-CommandConsumer commandConsumer(&lightAutomation, &warmFloor);
+CommandConsumer commandConsumer(&warmFloor);
 
 Handler handler(&configMgr, &networkMgr, &healthCheck, &modbus);
 
@@ -77,9 +85,7 @@ void setup()
 
     configMgr.setDefault([](Config* config) {
         snprintf(config->wifiAPSSID, WIFI_SSID_LEN, "Newton_%s", EDUtils::getMacAddress().c_str());
-        snprintf(config->mqttStateTopic, MQTT_TOPIC_LEN, "newton/%s/state", EDUtils::getChipID());
-        snprintf(config->mqttCommandTopic, MQTT_TOPIC_LEN, "newton/%s/set", EDUtils::getChipID());
-        snprintf(config->mqttLightSwitchCommandTopic, MQTT_TOPIC_LEN, "newton/%s/light/switch", EDUtils::getChipID());
+        snprintf(config->mqttTopicPrefix, MQTT_TOPIC_LEN, "newton/%s", EDUtils::getChipID());
         snprintf(config->mqttHADiscoveryPrefix, MQTT_TOPIC_LEN, "homeassistant");
         config->modbusSpeed = 9600;
         config->addressWBMSW = 1;
@@ -88,7 +94,14 @@ void setup()
         config->addressWBM1W2 = 5;
         config->addressMTD262MB = 6;
     });
+    migrateConfigV1ToV2(configMgr);
     configMgr.load();
+
+    std::string prefix = configMgr.getData()->mqttTopicPrefix;
+    char warmFloorStateTopic[MQTT_TOPIC_LEN] = {0};
+    char warmFloorCommandTopic[MQTT_TOPIC_LEN] = {0};
+    snprintf(warmFloorStateTopic, sizeof(warmFloorStateTopic), "%s/warm_floor/state", configMgr.getData()->mqttTopicPrefix);
+    snprintf(warmFloorCommandTopic, sizeof(warmFloorCommandTopic), "%s/warm_floor/set", configMgr.getData()->mqttTopicPrefix);
 
     // tmp
     EDUtils::LogConfig networkConfig;
@@ -106,7 +119,7 @@ void setup()
     ArduinoOTA.setPassword("somestrongpassword");
     ArduinoOTA.begin();
 
-    commandConsumer.init(configMgr.getData()->mqttCommandTopic);
+    commandConsumer.init(warmFloorCommandTopic);
 
     mqtt.init(configMgr.getData()->mqtt);
     networkMgr.OnConnect([&](bool isConnected) {
@@ -122,7 +135,7 @@ void setup()
     healthCheck.registerService(&mqtt);
     mqtt.subscribe(&commandConsumer);
 
-    stateProducer.init(configMgr.getData()->mqttStateTopic);
+    stateProducer.init(warmFloorStateTopic);
 
     handler.init();
 
@@ -141,20 +154,92 @@ void setup()
         ->setName(deviceName)
         ->setManufacturer(deviceManufacturer);
 
-    lightSwitchConsumer.init(configMgr.getData()->mqttLightSwitchCommandTopic);
-    mqtt.subscribe(&lightSwitchConsumer);
+    auto* msw = modbus.addMSW(configMgr.getData()->addressWBMSW);
+    msw->enableCO2Sensor(true);
+    auto* led1 = modbus.addLED(configMgr.getData()->addressWBLED1);
+    auto* led2 = modbus.addLED(configMgr.getData()->addressWBLED2);
+    auto* mtd = modbus.addMTD262MB(configMgr.getData()->addressMTD262MB);
 
-    complexSensor.init(device, configMgr.getData()->mqttStateTopic, configMgr.getData()->addressWBMSW);
-    mtd262mb.init(device, configMgr.getData()->mqttStateTopic, 1, configMgr.getData()->addressMTD262MB);
-    healthCheck.registerService(&mtd262mb);
+    temperatureSensor = new EDCommon::Sensor::WBMSWTemperature(msw);
+    if (!temperatureSensor->init(2, 10000, {
+            EDCommon::Sensor::withMQTT(&mqtt, prefix, "newton", "Temperature"),
+            EDCommon::Sensor::withDiscovery(&discoveryMgr, device),
+        })) {
+        LOGE("setup", "failed to init temperature sensor");
+    }
+
+    humiditySensor = new EDCommon::Sensor::WBMSWHumidity(msw);
+    if (!humiditySensor->init(2, 10000, {
+            EDCommon::Sensor::withMQTT(&mqtt, prefix, "newton", "Humidity"),
+            EDCommon::Sensor::withDiscovery(&discoveryMgr, device),
+        })) {
+        LOGE("setup", "failed to init humidity sensor");
+    }
+
+    airQualitySensor = new EDCommon::Sensor::WBMSWAirQuality(msw);
+    if (!airQualitySensor->init(0, 10000, {
+            EDCommon::Sensor::withMQTT(&mqtt, prefix, "newton", "Air quality"),
+            EDCommon::Sensor::withDiscovery(&discoveryMgr, device),
+            EDCommon::Sensor::withKalmanFilter(65, 10.0f),
+        })) {
+        LOGE("setup", "failed to init air quality sensor");
+    }
+
+    co2Sensor = new EDCommon::Sensor::WBMSWCO2(msw);
+    if (!co2Sensor->init(0, 10000, {
+            EDCommon::Sensor::withMQTT(&mqtt, prefix, "newton", "CO2"),
+            EDCommon::Sensor::withDiscovery(&discoveryMgr, device),
+        })) {
+        LOGE("setup", "failed to init co2 sensor");
+    }
+
+    lightLevelSensor = new EDCommon::Sensor::WBMSWLightLevel(msw);
+    if (!lightLevelSensor->init(2, 10000, {
+            EDCommon::Sensor::withMQTT(&mqtt, prefix, "newton", "Light level"),
+            EDCommon::Sensor::withDiscovery(&discoveryMgr, device),
+        })) {
+        LOGE("setup", "failed to init light level sensor");
+    }
+
+    presenceSensor = new EDCommon::BinarySensor::MTD262MB(mtd);
+    if (!presenceSensor->init(1000, {
+            EDCommon::BinarySensor::withMQTT(&mqtt, prefix, "newton", "Human detected 1"),
+            EDCommon::BinarySensor::withDiscovery(&discoveryMgr, device),
+        })) {
+        LOGE("setup", "failed to init presence sensor");
+    }
+
     oneWireModbus.init(configMgr.getData());
 
-    mainLight.init(configMgr.getData()->addressWBLED1);
-    backlight.init(configMgr.getData()->addressWBLED2);
+    auto* mainLightCCT = new EDCommon::Light::WBLedCCT(led1);
+    if (!mainLightCCT->init(1, 1, {
+            EDCommon::Light::withMQTT(&mqtt, prefix, "newton", "Light"),
+            EDCommon::Light::withDiscovery(&discoveryMgr, device),
+        })) {
+        LOGE("setup", "failed to init main light");
+    }
+    mainLight = mainLightCCT;
 
-    lightAutomation.init(device, configMgr.getData()->mqttStateTopic, configMgr.getData()->mqttCommandTopic, configMgr.getData()->mqttLightSwitchCommandTopic);
+    auto* backLightRGBW = new EDCommon::Light::WBLedRGBW(led2);
+    if (!backLightRGBW->init(0, {
+            EDCommon::Light::withMQTT(&mqtt, prefix, "newton", "Backlight"),
+            EDCommon::Light::withDiscovery(&discoveryMgr, device),
+        })) {
+        LOGE("setup", "failed to init backlight");
+    }
+    backLight = backLightRGBW;
 
-    warmFloor.init(device, configMgr.getData()->mqttStateTopic, configMgr.getData()->mqttCommandTopic, RELAY_WARM_FLOOR);
+    lightAutomation = new EDCommon::Automation::Light(mainLight, backLight, presenceSensor);
+    if (!lightAutomation->init("/light_state.bin", {
+            EDCommon::Automation::withMQTT(&mqtt, prefix, "newton", "Light automation"),
+            EDCommon::Automation::withDiscovery(&discoveryMgr, device),
+            EDCommon::Automation::withLightLevelSensor(lightLevelSensor, 150.0f),
+            EDCommon::Automation::withNightMode(),
+        })) {
+        LOGE("setup", "failed to init light automation");
+    }
+
+    warmFloor.init(device, warmFloorStateTopic, warmFloorCommandTopic, RELAY_WARM_FLOOR);
     healthCheck.registerService(&warmFloor);
 
     LOGI("setup", "complete");
@@ -166,10 +251,16 @@ void loop()
     discoveryMgr.loop();
     ArduinoOTA.handle();
     healthCheck.loop();
-    complexSensor.loop();
+    if (temperatureSensor) temperatureSensor->update();
+    if (humiditySensor) humiditySensor->update();
+    if (airQualitySensor) airQualitySensor->update();
+    if (co2Sensor) co2Sensor->update();
+    if (lightLevelSensor) lightLevelSensor->update();
     stateMgr.loop();
-    lightAutomation.loop();
+    if (mainLight) mainLight->update();
+    if (backLight) backLight->update();
+    if (lightAutomation) lightAutomation->update();
     warmFloor.loop();
-    mtd262mb.loop();
+    if (presenceSensor) presenceSensor->update();
     networkLogger.update();
 }
